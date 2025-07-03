@@ -13,6 +13,9 @@
 #include <QTextCharFormat>
 #include <QTextCursor>
 #include <QScrollBar>
+#include <QNetworkInterface>
+#include <QHostAddress>
+#include <cstdlib>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
@@ -21,10 +24,17 @@ MainWindow::MainWindow(QWidget* parent)
       ros2_executor_(new ROS2Executor(this)),
       process_monitor_(new ProcessMonitor(this)),
       config_manager_(new ConfigManager(this)),
-      ros_spin_timer_(new QTimer(this)) {
+      ros_spin_timer_(new QTimer(this)),
+      status_update_timer_(new QTimer(this)) {
   
   SetupUI();
   SetupROS2();
+  
+  // Setup status update timer
+  connect(status_update_timer_, &QTimer::timeout, this, &MainWindow::UpdateStatusInfo);
+  status_update_timer_->start(5000); // Update every 5 seconds
+  UpdateStatusInfo(); // Initial update
+  
   setWindowTitle("ROS Synapse");
   resize(1200, 800);
 }
@@ -69,6 +79,10 @@ void MainWindow::SetupUI() {
   setCentralWidget(central_widget_);
   
   QVBoxLayout* main_layout = new QVBoxLayout(central_widget_);
+  
+  // Setup status row at the top
+  SetupStatusRow();
+  main_layout->addWidget(status_frame_);
   
   // Create tab widget for main content
   tab_widget_ = new QTabWidget(this);
@@ -182,4 +196,101 @@ void MainWindow::AppendLogMessage(const QString& message, const QString& level) 
     cursor.movePosition(QTextCursor::Down, QTextCursor::KeepAnchor, 100);
     cursor.removeSelectedText();
   }
+}
+
+void MainWindow::SetupStatusRow() {
+  // Create status frame
+  status_frame_ = new QFrame(this);
+  status_frame_->setFrameStyle(QFrame::StyledPanel | QFrame::Raised);
+  status_frame_->setFixedHeight(40);
+  status_frame_->setStyleSheet(
+    "QFrame { "
+    "  background-color: #3b3b3b; "
+    "  border: 1px solid #555555; "
+    "  border-radius: 4px; "
+    "}"
+  );
+  
+  // Create horizontal layout for status frame
+  QHBoxLayout* status_layout = new QHBoxLayout(status_frame_);
+  status_layout->setContentsMargins(10, 5, 10, 5);
+  
+  // Create domain ID label
+  domain_id_label_ = new QLabel("ROS_DOMAIN_ID: Loading...", this);
+  domain_id_label_->setStyleSheet(
+    "QLabel { "
+    "  color: #ffffff; "
+    "  font-weight: bold; "
+    "  padding: 2px 8px; "
+    "  background-color: #4a4a4a; "
+    "  border-radius: 3px; "
+    "}"
+  );
+  
+  // Create IPv4 label
+  ipv4_label_ = new QLabel("IPv4: Loading...", this);
+  ipv4_label_->setStyleSheet(
+    "QLabel { "
+    "  color: #ffffff; "
+    "  font-weight: bold; "
+    "  padding: 2px 8px; "
+    "  background-color: #4a4a4a; "
+    "  border-radius: 3px; "
+    "}"
+  );
+  
+  // Add labels to layout
+  status_layout->addWidget(domain_id_label_);
+  status_layout->addWidget(ipv4_label_);
+  status_layout->addStretch(); // Push labels to the left
+}
+
+void MainWindow::UpdateStatusInfo() {
+  // Update ROS_DOMAIN_ID
+  QString domain_id = GetRosDomainId();
+  domain_id_label_->setText(QString("ROS_DOMAIN_ID: %1").arg(domain_id));
+  
+  // Update IPv4 address
+  QString ipv4 = GetLocalIPv4Address();
+  ipv4_label_->setText(QString("IPv4: %1").arg(ipv4));
+}
+
+QString MainWindow::GetRosDomainId() {
+  // Try to get ROS_DOMAIN_ID from environment variable
+  const char* domain_id_env = std::getenv("ROS_DOMAIN_ID");
+  if (domain_id_env && strlen(domain_id_env) > 0) {
+    return QString(domain_id_env);
+  }
+  
+  // Default to 0 if not set
+  return "0 (default)";
+}
+
+QString MainWindow::GetLocalIPv4Address() {
+  // Get all network interfaces
+  QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
+  
+  for (const QNetworkInterface& interface : interfaces) {
+    // Skip loopback and inactive interfaces
+    if (interface.flags() & QNetworkInterface::IsLoopBack ||
+        !(interface.flags() & QNetworkInterface::IsUp) ||
+        !(interface.flags() & QNetworkInterface::IsRunning)) {
+      continue;
+    }
+    
+    // Get address entries for this interface
+    QList<QNetworkAddressEntry> entries = interface.addressEntries();
+    for (const QNetworkAddressEntry& entry : entries) {
+      QHostAddress addr = entry.ip();
+      
+      // Look for IPv4 addresses that are not loopback
+      if (addr.protocol() == QAbstractSocket::IPv4Protocol &&
+          !addr.isLoopback() &&
+          !addr.isNull()) {
+        return addr.toString();
+      }
+    }
+  }
+  
+  return "Not Available";
 }

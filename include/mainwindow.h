@@ -17,6 +17,9 @@
 #include <QMenuBar>
 #include <QAction>
 #include <QTimer>
+#include <QLabel>
+#include <QFrame>
+#include <QNetworkInterface>
 #include <rclcpp/rclcpp.hpp>
 #include <rcl_interfaces/msg/log.hpp>
 
@@ -44,12 +47,16 @@ class MainWindow : public QMainWindow {
 
  private:
   void SetupUI();
+  void SetupStatusRow();
   void SetupMenuBar();
   void SetupStatusBar();
   void SetupConnections();
   void SetupTheme();
   void SetupROS2();
   void AppendLogMessage(const QString& message, const QString& level);
+  void UpdateStatusInfo();
+  QString GetLocalIPv4Address();
+  QString GetRosDomainId();
 
   QTabWidget* tab_widget_;
   QWidget* quick_launch_tab_;
@@ -62,6 +69,12 @@ class MainWindow : public QMainWindow {
   QTextEdit* log_display_;
   QSplitter* main_splitter_;
   QWidget* central_widget_;
+  
+  // Status row widgets
+  QFrame* status_frame_;
+  QLabel* domain_id_label_;
+  QLabel* ipv4_label_;
+  QTimer* status_update_timer_;
   
   SSHManager* ssh_manager_;
   ROS2Executor* ros2_executor_;

@@ -1498,9 +1498,11 @@ ros_synapse_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qvalidator.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtGui/qwindowdefs.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtNetwork/QHostAddress \
+	/usr/include/x86_64-linux-gnu/qt6/QtNetwork/QNetworkInterface \
 	/usr/include/x86_64-linux-gnu/qt6/QtNetwork/QTcpSocket \
 	/usr/include/x86_64-linux-gnu/qt6/QtNetwork/qabstractsocket.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtNetwork/qhostaddress.h \
+	/usr/include/x86_64-linux-gnu/qt6/QtNetwork/qnetworkinterface.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtNetwork/qtcpsocket.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtNetwork/qtnetwork-config.h \
 	/usr/include/x86_64-linux-gnu/qt6/QtNetwork/qtnetworkexports.h \
@@ -1509,6 +1511,7 @@ ros_synapse_autogen/timestamp: \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QComboBox \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QDoubleSpinBox \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QFormLayout \
+	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QFrame \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QGroupBox \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QHBoxLayout \
 	/usr/include/x86_64-linux-gnu/qt6/QtWidgets/QLabel \
