@@ -1,33 +1,22 @@
 # ROS Synapse
 
-A modern Qt6-based launcher and ROS2 log monitor for robotics development. ROS Synapse provides an intuitive GUI for ROS2 command execution, real-time log monitoring, SSH management, and process monitoring.
+A desktop program to help you launch your robot.
 
-![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
+This program seeks to solve the requirement to have several terminal windows open at once with separate command flags and logs to be managed. 
+
+Currently for Linux only
+
+Uses Qt6 and TOML settings
+
 ![ROS2](https://img.shields.io/badge/ROS2-Jazzy-green.svg)
 ![Qt6](https://img.shields.io/badge/Qt-6-brightgreen.svg)
 
-## Features
+## Future goals
 
-### **Command Controls**
-- **3-Row Control Interface**: Pre-configured command execution with customizable dropdown options
-- **TOML Configuration**: All command options and defaults defined in `settings.toml`
-- **One-Click Execution**: Quick launch buttons for common ROS2 operations
+- To use Generative AI to judge the status of the robot in realtime.
 
-### **Real-Time Log Monitoring**
-- **Live ROS2 Log Viewer**: Subscribes to `/rosout` for real-time log display
-- **Color-Coded Messages**: 
-  - **Red**: ERROR and FATAL messages
-  - **Yellow**: WARNING messages  
-  - **White**: INFO and DEBUG messages
-- **Auto-Scrolling**: Automatically scrolls to show latest messages
-- **Buffer Management**: Maintains last 1000 log entries
 
-### **Configuration Management**
-- **TOML-Based Settings**: Human-readable configuration in `settings.toml`
-- **Dark Mode Support**: Modern dark theme interface
-- **Persistent Settings**: UI preferences and connection profiles
-
-## Prerequisites
+## Assumed Enivronment
 
 - **OS**: Ubuntu 24.04 LTS
 - **ROS2**: Jazzy Jalopy
@@ -174,10 +163,6 @@ ros2 run ros_synapse ros_synapse
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under MIT
 
-## Acknowledgments
 
-- Built with Qt6 for modern cross-platform GUI
-- Integrates with ROS2 ecosystem for robotics development
-- Uses tomlplusplus for human-readable configuration
