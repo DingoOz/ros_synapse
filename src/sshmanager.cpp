@@ -2,13 +2,40 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "sshmanager.h"
+#include <QTimer>
+#include <QDebug>
 
 SSHManager::SSHManager(QObject* parent)
     : QObject(parent),
+      ssh_process_(nullptr),
+      connection_timer_(new QTimer(this)),
+      heartbeat_timer_(new QTimer(this)),
+      test_socket_(nullptr),
+      port_(22),
       connection_state_(kDisconnected),
-      is_connected_(false) {}
+      is_connected_(false),
+      use_key_auth_(false),
+      connection_timeout_(kDefaultConnectionTimeout),
+      heartbeat_interval_(kDefaultHeartbeatInterval),
+      max_reconnect_attempts_(kMaxReconnectAttempts),
+      reconnect_attempts_(0) {
+  
+  SetupProcess();
+  
+  // Setup connection timeout timer
+  connection_timer_->setSingleShot(true);
+  connect(connection_timer_, &QTimer::timeout, this, &SSHManager::OnConnectionTimeout);
+  
+  // Setup heartbeat timer
+  connect(heartbeat_timer_, &QTimer::timeout, this, &SSHManager::OnHeartbeatTimeout);
+}
 
-SSHManager::~SSHManager() {}
+SSHManager::~SSHManager() {
+  if (ssh_process_) {
+    ssh_process_->kill();
+    ssh_process_->waitForFinished(3000);
+  }
+}
 
 void SSHManager::SetConnectionParams(const QString& host, const QString& username,
                                      int port, const QString& password) {
@@ -34,12 +61,55 @@ QString SSHManager::GetLastError() const {
   return last_error_;
 }
 
-void SSHManager::ConnectToHost() {}
+void SSHManager::ConnectToHost() {
+  if (is_connected_) {
+    return;
+  }
+  
+  if (host_.isEmpty() || username_.isEmpty()) {
+    HandleConnectionError("Host or username not set");
+    return;
+  }
+  
+  connection_state_ = kConnecting;
+  emit ConnectionStateChanged(connection_state_);
+  
+  StartConnection();
+}
 
-void SSHManager::DisconnectFromHost() {}
+void SSHManager::DisconnectFromHost() {
+  if (!is_connected_) {
+    return;
+  }
+  
+  is_connected_ = false;
+  connection_state_ = kDisconnected;
+  
+  if (ssh_process_) {
+    ssh_process_->write("exit\n");
+    ssh_process_->waitForFinished(3000);
+    if (ssh_process_->state() != QProcess::NotRunning) {
+      ssh_process_->kill();
+    }
+  }
+  
+  StopHeartbeat();
+  emit ConnectionStateChanged(connection_state_);
+  emit Disconnected();
+}
 
 void SSHManager::ExecuteCommand(const QString& command) {
-  Q_UNUSED(command)
+  if (!is_connected_ || !ssh_process_) {
+    emit ErrorOccurred("Not connected to SSH server");
+    return;
+  }
+  
+  if (command.trimmed().isEmpty()) {
+    return;
+  }
+  
+  QString cmd = command.trimmed() + "\n";
+  ssh_process_->write(cmd.toUtf8());
 }
 
 void SSHManager::ExecuteCommandAsync(const QString& command) {
@@ -53,37 +123,237 @@ void SSHManager::SendInput(const QString& input) {
 void SSHManager::Reconnect() {}
 
 void SSHManager::OnProcessFinished(int exit_code, QProcess::ExitStatus exit_status) {
-  Q_UNUSED(exit_code)
   Q_UNUSED(exit_status)
+  
+  is_connected_ = false;
+  connection_state_ = kDisconnected;
+  connection_timer_->stop();
+  StopHeartbeat();
+  
+  emit ConnectionStateChanged(connection_state_);
+  emit Disconnected();
+  emit CommandFinished("SSH session", exit_code);
 }
 
 void SSHManager::OnProcessError(QProcess::ProcessError error) {
-  Q_UNUSED(error)
+  QString error_message;
+  switch (error) {
+    case QProcess::FailedToStart:
+      error_message = "SSH process failed to start - check if ssh is installed";
+      break;
+    case QProcess::Crashed:
+      error_message = "SSH process crashed";
+      break;
+    case QProcess::Timedout:
+      error_message = "SSH process timed out";
+      break;
+    case QProcess::WriteError:
+      error_message = "SSH process write error";
+      break;
+    case QProcess::ReadError:
+      error_message = "SSH process read error";
+      break;
+    default:
+      error_message = "Unknown SSH process error";
+      break;
+  }
+  
+  HandleConnectionError(error_message);
 }
 
-void SSHManager::OnProcessStarted() {}
+void SSHManager::OnProcessStarted() {
+  emit CommandOutput("SSH process started...");
+  
+  // Send password if provided
+  if (!password_.isEmpty()) {
+    // Wait a bit for password prompt
+    QTimer::singleShot(1000, [this]() {
+      if (ssh_process_ && ssh_process_->state() == QProcess::Running) {
+        ssh_process_->write((password_ + "\n").toUtf8());
+      }
+    });
+  }
+}
 
-void SSHManager::OnReadyReadStandardOutput() {}
+void SSHManager::OnReadyReadStandardOutput() {
+  if (!ssh_process_) {
+    return;
+  }
+  
+  QByteArray data = ssh_process_->readAllStandardOutput();
+  QString output = QString::fromUtf8(data);
+  
+  if (!output.isEmpty()) {
+    // Filter out password from output (in case it gets echoed)
+    QString filtered_output = output;
+    if (!password_.isEmpty()) {
+      filtered_output = filtered_output.replace(password_, "[PASSWORD HIDDEN]");
+    }
+    
+    // Check if this looks like a successful connection (MOTD, shell prompt, etc.)
+    if (!is_connected_ && (output.contains("$") || output.contains("#") || 
+                          output.contains("Welcome") || output.contains("Last login") ||
+                          output.contains("Ubuntu") || output.contains("Linux"))) {
+      is_connected_ = true;
+      connection_state_ = kConnected;
+      connection_timer_->stop();
+      StartHeartbeat();
+      emit ConnectionStateChanged(connection_state_);
+      emit Connected();
+    }
+    
+    emit CommandOutput(filtered_output);
+  }
+}
 
-void SSHManager::OnReadyReadStandardError() {}
+void SSHManager::OnReadyReadStandardError() {
+  if (!ssh_process_) {
+    return;
+  }
+  
+  QByteArray data = ssh_process_->readAllStandardError();
+  QString error = QString::fromUtf8(data);
+  
+  if (!error.isEmpty()) {
+    // Filter out password from error output
+    QString filtered_error = error;
+    if (!password_.isEmpty()) {
+      filtered_error = filtered_error.replace(password_, "[PASSWORD HIDDEN]");
+    }
+    
+    // Check for password prompts
+    if (error.contains("password:", Qt::CaseInsensitive) && !password_.isEmpty()) {
+      ssh_process_->write((password_ + "\n").toUtf8());
+      emit CommandOutput("[Password prompt detected - entering password]");
+      return;
+    }
+    
+    // Check for authentication failures
+    if (error.contains("Permission denied") || error.contains("Authentication failed")) {
+      HandleConnectionError("Authentication failed - check username/password");
+      return;
+    }
+    
+    // Check for connection failures
+    if (error.contains("Connection refused") || error.contains("No route to host")) {
+      HandleConnectionError("Connection failed - check host and port");
+      return;
+    }
+    
+    emit CommandOutput("SSH Error: " + filtered_error);
+  }
+}
 
-void SSHManager::OnConnectionTimeout() {}
+void SSHManager::OnConnectionTimeout() {
+  if (!is_connected_) {
+    HandleConnectionError("Connection timeout - server did not respond");
+  }
+}
 
 void SSHManager::OnHeartbeatTimeout() {}
 
 void SSHManager::CheckConnection() {}
 
-void SSHManager::SetupProcess() {}
-
-void SSHManager::StartConnection() {}
-
-void SSHManager::HandleConnectionError(const QString& error) {
-  Q_UNUSED(error)
+void SSHManager::SetupProcess() {
+  if (ssh_process_) {
+    ssh_process_->deleteLater();
+  }
+  
+  ssh_process_ = new QProcess(this);
+  
+  connect(ssh_process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+          this, &SSHManager::OnProcessFinished);
+  connect(ssh_process_, &QProcess::errorOccurred,
+          this, &SSHManager::OnProcessError);
+  connect(ssh_process_, &QProcess::started,
+          this, &SSHManager::OnProcessStarted);
+  connect(ssh_process_, &QProcess::readyReadStandardOutput,
+          this, &SSHManager::OnReadyReadStandardOutput);
+  connect(ssh_process_, &QProcess::readyReadStandardError,
+          this, &SSHManager::OnReadyReadStandardError);
 }
 
-void SSHManager::StartHeartbeat() {}
+void SSHManager::StartConnection() {
+  if (!ssh_process_) {
+    SetupProcess();
+  }
+  
+  QString program;
+  QStringList arguments;
+  
+  // Check if we can use sshpass for password authentication
+  if (!password_.isEmpty()) {
+    // Try to use sshpass if available
+    program = "sshpass";
+    arguments << "-p" << password_
+             << "ssh"
+             << "-t"  // Allocate a TTY
+             << "-o" << "StrictHostKeyChecking=no"
+             << "-o" << "UserKnownHostsFile=/dev/null"
+             << "-o" << "LogLevel=QUIET"
+             << "-o" << "PubkeyAuthentication=no"  // Force password auth
+             << "-p" << QString::number(port_)
+             << QString("%1@%2").arg(username_, host_);
+  } else {
+    // Use regular ssh without password
+    program = "ssh";
+    arguments << "-t"  // Allocate a TTY
+             << "-o" << "StrictHostKeyChecking=no"
+             << "-o" << "UserKnownHostsFile=/dev/null"
+             << "-o" << "LogLevel=QUIET"
+             << "-p" << QString::number(port_)
+             << QString("%1@%2").arg(username_, host_);
+  }
+  
+  // Start SSH process
+  connection_timer_->start(connection_timeout_);
+  ssh_process_->start(program, arguments);
+  
+  if (!ssh_process_->waitForStarted(5000)) {
+    if (program == "sshpass") {
+      emit CommandOutput("[sshpass not available - trying manual password entry]");
+      // Fall back to regular SSH with manual password handling
+      program = "ssh";
+      arguments.clear();
+      arguments << "-t"  // Allocate a TTY
+               << "-o" << "StrictHostKeyChecking=no"
+               << "-o" << "UserKnownHostsFile=/dev/null"
+               << "-o" << "LogLevel=QUIET"
+               << "-o" << "PubkeyAuthentication=no"  // Force password auth
+               << "-p" << QString::number(port_)
+               << QString("%1@%2").arg(username_, host_);
+      
+      ssh_process_->start(program, arguments);
+      if (!ssh_process_->waitForStarted(5000)) {
+        HandleConnectionError("Failed to start SSH process");
+        return;
+      }
+    } else {
+      HandleConnectionError("Failed to start SSH process");
+      return;
+    }
+  }
+}
 
-void SSHManager::StopHeartbeat() {}
+void SSHManager::HandleConnectionError(const QString& error) {
+  last_error_ = error;
+  connection_state_ = kError;
+  is_connected_ = false;
+  
+  connection_timer_->stop();
+  StopHeartbeat();
+  
+  emit ConnectionStateChanged(connection_state_);
+  emit ErrorOccurred(error);
+}
+
+void SSHManager::StartHeartbeat() {
+  heartbeat_timer_->start(heartbeat_interval_);
+}
+
+void SSHManager::StopHeartbeat() {
+  heartbeat_timer_->stop();
+}
 
 void SSHManager::ProcessCommandQueue() {}
 
