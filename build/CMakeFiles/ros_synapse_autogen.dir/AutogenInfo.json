@@ -184,7 +184,10 @@
 		"/usr/lib/x86_64-linux-gnu/cmake/Qt6Network/Qt6NetworkTargets.cmake",
 		"/usr/lib/x86_64-linux-gnu/cmake/Qt6Network/Qt6NetworkTargets-none.cmake",
 		"/usr/lib/x86_64-linux-gnu/cmake/Qt6Network/Qt6NetworkAdditionalTargetInfo.cmake",
-		"/usr/lib/x86_64-linux-gnu/cmake/Qt6Network/Qt6NetworkVersionlessTargets.cmake"
+		"/usr/lib/x86_64-linux-gnu/cmake/Qt6Network/Qt6NetworkVersionlessTargets.cmake",
+		"/usr/share/cmake-3.28/Modules/FindPkgConfig.cmake",
+		"/usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake",
+		"/usr/share/cmake-3.28/Modules/FindPackageMessage.cmake"
 	],
 	"CMAKE_SOURCE_DIR" : "/home/dingo/Programming/ros_synapse",
 	"DEP_FILE" : "/home/dingo/Programming/ros_synapse/build/ros_synapse_autogen/deps",
