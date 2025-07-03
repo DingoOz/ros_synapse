@@ -23,11 +23,8 @@ ConfigManager::ConfigManager(QObject* parent)
   
   try {
     toml_config_ = toml::parse_file(toml_path.toStdString());
-    qDebug() << "Successfully loaded settings.toml from" << toml_path;
   } catch (const toml::parse_error& err) {
     qWarning() << "Failed to parse settings.toml:" << err.what();
-    qDebug() << "Working directory:" << QDir::currentPath();
-    qDebug() << "Tried path:" << toml_path;
   }
 }
 
@@ -184,24 +181,13 @@ QStringList ConfigManager::GetControlDropdownOptions(const QString& control_name
 }
 
 QString ConfigManager::GetControlDefaultValue(const QString& control_name) const {
-  qDebug() << "Looking for default value for:" << control_name;
   try {
     if (auto controls = toml_config_["controls"]) {
-      qDebug() << "Found controls section";
       if (auto default_val = controls[control_name.toStdString()]) {
-        qDebug() << "Found key:" << control_name;
         if (default_val.is_string()) {
-          QString result = QString::fromStdString(default_val.as_string()->get());
-          qDebug() << "Default value:" << result;
-          return result;
-        } else {
-          qDebug() << "Value is not a string";
+          return QString::fromStdString(default_val.as_string()->get());
         }
-      } else {
-        qDebug() << "Key not found:" << control_name;
       }
-    } else {
-      qDebug() << "Controls section not found";
     }
   } catch (const std::exception& e) {
     qWarning() << "Error reading control default:" << e.what();
