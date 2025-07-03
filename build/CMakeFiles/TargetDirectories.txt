@@ -1,4 +1,7 @@
+/home/dingo/Programming/ros_synapse/build/CMakeFiles/uninstall.dir
+/home/dingo/Programming/ros_synapse/build/CMakeFiles/ros_synapse_uninstall.dir
 /home/dingo/Programming/ros_synapse/build/CMakeFiles/ros_synapse.dir
+/home/dingo/Programming/ros_synapse/build/CMakeFiles/test.dir
 /home/dingo/Programming/ros_synapse/build/CMakeFiles/edit_cache.dir
 /home/dingo/Programming/ros_synapse/build/CMakeFiles/rebuild_cache.dir
 /home/dingo/Programming/ros_synapse/build/CMakeFiles/list_install_components.dir

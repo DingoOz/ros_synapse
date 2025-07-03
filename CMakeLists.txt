@@ -13,6 +13,11 @@ endif()
 # Find Qt6
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
 
+# Find ROS2 packages
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rcl_interfaces REQUIRED)
+
 # Find tomlplusplus
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(TOMLPLUSPLUS REQUIRED tomlplusplus)
@@ -57,6 +62,12 @@ target_link_libraries(${PROJECT_NAME}
   ${TOMLPLUSPLUS_LIBRARIES}
 )
 
+# Add ROS2 dependencies
+ament_target_dependencies(${PROJECT_NAME}
+  rclcpp
+  rcl_interfaces
+)
+
 # Include TOML headers
 target_include_directories(${PROJECT_NAME} PRIVATE ${TOMLPLUSPLUS_INCLUDE_DIRS})
 
@@ -64,3 +75,5 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${TOMLPLUSPLUS_INCLUDE_DIRS})
 install(TARGETS ${PROJECT_NAME}
   DESTINATION bin
 )
+
+ament_package()
