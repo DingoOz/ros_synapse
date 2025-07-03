@@ -111,3 +111,9 @@ When modifying control layouts: Update both the TOML configuration structure and
 When adding new UI components: Follow the established pattern of header declaration, implementation in src/, and integration through MainWindow's tabbed interface.
 
 When working with TOML configuration: Remember the file path resolution from build directory and ensure proper exception handling for missing keys or malformed data.
+
+## user instructions
+
+Please use the cmake system to build and not colcon unless it is necessary because the colcon build create a sub-directory that breaks the settings file location.
+
+Ask the user to install any apt packages needed
