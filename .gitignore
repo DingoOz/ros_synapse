@@ -39,3 +39,88 @@
 
 # debug information files
 *.dwo
+
+# Build directories
+build/
+bin/
+lib/
+devel/
+install/
+log/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+CTestConfiguration.ini
+CTestCustom.cmake
+CTestTestfile.cmake
+
+# Qt generated files
+*.moc
+*.qrc.cpp
+*.ui.h
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+*.pro.user
+*.pro.user.*
+.qmake.stash
+
+# ROS2 generated files
+COLCON_IGNORE
+AMENT_IGNORE
+*.egg-info/
+
+# Project-specific executables
+ros_synapse
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Package files
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# Backup files
+*.bak
+*.backup
+
+# Configuration overrides (keep template)
+settings.toml.local
+config.local.*
+
+# Test artifacts
+test_results/
+coverage/
+*.gcov
+*.gcda
+*.gcno
+
+# Documentation build
+docs/_build/
