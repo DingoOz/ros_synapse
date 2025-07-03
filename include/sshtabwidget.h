@@ -48,6 +48,7 @@ class SSHTabWidget : public QWidget {
   void SetupUI();
   void SetupConnectionArea();
   void SetupCommandRows();
+  void LoadDefaultsFromConfig();
   void UpdateStatusLabel();
   void ParseSSHAddress(const QString& address, QString& user, QString& host, 
                        int& port);
