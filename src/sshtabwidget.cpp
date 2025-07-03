@@ -4,6 +4,7 @@
 #include "sshtabwidget.h"
 #include "configmanager.h"
 #include "sshmanager.h"
+#include "sshpassworddialog.h"
 #include <QRegularExpression>
 #include <QDebug>
 #include <QScrollBar>
@@ -77,7 +78,7 @@ void SSHTabWidget::SetupConnectionArea() {
   address_label_ = new QLabel("SSH Address:", this);
   ssh_address_edit_ = new QLineEdit(this);
   ssh_address_edit_->setPlaceholderText("user@host or user@host -p port");
-  ssh_address_edit_->setText("dingo@192.168.1.235");  // Default example
+  ssh_address_edit_->setText("dingo@turtlebot3");  // Default example
   
   // Connect and disconnect buttons
   connect_button_ = new QPushButton("Connect", this);
@@ -110,6 +111,13 @@ void SSHTabWidget::SetupConnectionArea() {
           this, &SSHTabWidget::OnDisconnectButtonClicked);
   connect(ssh_address_edit_, &QLineEdit::textChanged,
           this, &SSHTabWidget::OnSSHAddressChanged);
+  
+  // Allow Enter key to trigger connect when address field has focus
+  connect(ssh_address_edit_, &QLineEdit::returnPressed, [this]() {
+    if (connect_button_->isEnabled() && !ssh_address_edit_->text().trimmed().isEmpty()) {
+      OnConnectButtonClicked();
+    }
+  });
 }
 
 void SSHTabWidget::SetupCommandRows() {
@@ -170,23 +178,41 @@ void SSHTabWidget::OnConnectButtonClicked() {
   current_host_ = host;
   current_port_ = port;
   
-  output_display_->append(QString("Connecting to %1@%2:%3...").arg(user, host).arg(port));
+  // Show password dialog
+  SSHPasswordDialog* password_dialog = new SSHPasswordDialog(user, host, port, this);
   
-  // Configure SSH manager
-  ssh_manager_->SetConnectionParams(host, user, port);
-  ssh_manager_->ConnectToHost();
+  if (password_dialog->exec() == QDialog::Accepted) {
+    QString password = password_dialog->GetPassword();
+    
+    // Output raw SSH connection information
+    output_display_->append("=== SSH Connection Details ===");
+    output_display_->append(QString("SSH Address: %1").arg(address));
+    output_display_->append(QString("Parsed - User: %1, Host: %2, Port: %3").arg(user, host).arg(port));
+    output_display_->append(QString("Password: %1").arg(password.isEmpty() ? "[Empty]" : QString("[%1 characters]").arg(password.length())));
+    output_display_->append(QString("SSH Command: ssh %1@%2 -p %3").arg(user, host).arg(port));
+    output_display_->append("=============================");
+    output_display_->append(QString("Connecting to %1@%2:%3...").arg(user, host).arg(port));
+    
+    // Configure SSH manager with password
+    ssh_manager_->SetConnectionParams(host, user, port, password);
+    ssh_manager_->ConnectToHost();
+    
+    connect_button_->setEnabled(false);
+    status_label_->setText("Connecting...");
+    status_label_->setStyleSheet(
+      "QLabel { "
+      "  color: #ffaa00; "
+      "  font-weight: bold; "
+      "  padding: 2px 8px; "
+      "  background-color: #4a4a4a; "
+      "  border-radius: 3px; "
+      "}"
+    );
+  } else {
+    output_display_->append("Connection cancelled by user");
+  }
   
-  connect_button_->setEnabled(false);
-  status_label_->setText("Connecting...");
-  status_label_->setStyleSheet(
-    "QLabel { "
-    "  color: #ffaa00; "
-    "  font-weight: bold; "
-    "  padding: 2px 8px; "
-    "  background-color: #4a4a4a; "
-    "  border-radius: 3px; "
-    "}"
-  );
+  password_dialog->deleteLater();
 }
 
 void SSHTabWidget::OnDisconnectButtonClicked() {
@@ -214,6 +240,11 @@ void SSHTabWidget::OnCommandRowButtonClicked(int row) {
     full_command += " " + command2;
   }
   
+  output_display_->append(QString("=== Executing SSH Command ==="));
+  output_display_->append(QString("Command: %1").arg(full_command));
+  output_display_->append(QString("Row: %1").arg(row + 1));
+  output_display_->append(QString("SSH Target: %1@%2:%3").arg(current_user_, current_host_).arg(current_port_));
+  output_display_->append("=============================");
   output_display_->append(QString("$ %1").arg(full_command));
   ssh_manager_->ExecuteCommand(full_command);
 }
@@ -233,9 +264,15 @@ void SSHTabWidget::OnSSHConnectionStatusChanged(bool connected) {
   emit ConnectionStatusChanged(connected);
   
   if (connected) {
-    output_display_->append(QString("Connected to %1@%2:%3").arg(current_user_, current_host_).arg(current_port_));
+    output_display_->append("=== SSH Connection Established ===");
+    output_display_->append(QString("Successfully connected to %1@%2:%3").arg(current_user_, current_host_).arg(current_port_));
+    output_display_->append(QString("SSH session active - ready to execute commands"));
+    output_display_->append("================================");
   } else {
-    output_display_->append("Disconnected from SSH");
+    output_display_->append("=== SSH Connection Closed ===");
+    output_display_->append("Disconnected from SSH server");
+    output_display_->append("Command execution disabled");
+    output_display_->append("=============================");
   }
 }
 
@@ -248,11 +285,18 @@ void SSHTabWidget::OnSSHCommandOutput(const QString& output) {
 }
 
 void SSHTabWidget::OnSSHCommandFinished(const QString& command, int exit_code) {
-  output_display_->append(QString("Command '%1' finished with exit code: %2").arg(command).arg(exit_code));
+  output_display_->append("=== Command Execution Complete ===");
+  output_display_->append(QString("Command: %1").arg(command));
+  output_display_->append(QString("Exit Code: %1").arg(exit_code));
+  output_display_->append(QString("Status: %1").arg(exit_code == 0 ? "SUCCESS" : "FAILED"));
+  output_display_->append("================================");
 }
 
 void SSHTabWidget::OnSSHErrorOccurred(const QString& error) {
-  output_display_->append(QString("SSH Error: %1").arg(error));
+  output_display_->append("=== SSH ERROR OCCURRED ===");
+  output_display_->append(QString("Error: %1").arg(error));
+  output_display_->append(QString("Target: %1@%2:%3").arg(current_user_, current_host_).arg(current_port_));
+  output_display_->append("=========================");
 }
 
 void SSHTabWidget::UpdateConnectionStatus() {
