@@ -45,6 +45,7 @@ class MainWindow : public QMainWindow {
   void ShowAbout();
   void ShowSettings();
   void OnLogMessageReceived(const rcl_interfaces::msg::Log::SharedPtr msg);
+  void OnSSHConnectionChanged(bool connected);
 
  private:
   void SetupUI();
@@ -54,8 +55,10 @@ class MainWindow : public QMainWindow {
   void SetupConnections();
   void SetupTheme();
   void SetupROS2();
+  void SetupSSHStatusTracking();
   void AppendLogMessage(const QString& message, const QString& level);
   void UpdateStatusInfo();
+  void UpdateSSHConnectionStatus();
   QString GetLocalIPv4Address();
   QString GetRosDomainId();
 
@@ -76,7 +79,12 @@ class MainWindow : public QMainWindow {
   QFrame* status_frame_;
   QLabel* domain_id_label_;
   QLabel* ipv4_label_;
+  QLabel* ssh_status_label_;
   QTimer* status_update_timer_;
+  
+  // SSH connection tracking
+  bool ssh_connected_;
+  QString ssh_remote_address_;
   
   SSHManager* ssh_manager_;
   ROS2Executor* ros2_executor_;

@@ -28,6 +28,8 @@ class SSHTabWidget : public QWidget {
  public:
   explicit SSHTabWidget(QWidget* parent = nullptr);
   ~SSHTabWidget();
+  
+  QString GetCurrentHost() const;
 
  signals:
   void CommandExecuted(const QString& command, const QString& output);

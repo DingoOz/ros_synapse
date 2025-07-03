@@ -43,6 +43,10 @@ SSHTabWidget::SSHTabWidget(QWidget* parent)
 
 SSHTabWidget::~SSHTabWidget() {}
 
+QString SSHTabWidget::GetCurrentHost() const {
+  return current_host_;
+}
+
 void SSHTabWidget::SetupUI() {
   QVBoxLayout* main_layout = new QVBoxLayout(this);
   

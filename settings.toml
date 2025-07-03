@@ -36,7 +36,7 @@ key_file = "~/.ssh/id_rsa"
 
 [ssh]
 # SSH default values
-default_address = "ubuntu@raspberrypi"
+default_address = "dingo@turtlebot3"
 default_commands = [
     ["watch df", "-h"],
     ["htop", ""]

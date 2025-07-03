@@ -99,7 +99,7 @@ void SSHManager::DisconnectFromHost() {
 }
 
 void SSHManager::ExecuteCommand(const QString& command) {
-  if (!is_connected_ || !ssh_process_) {
+  if (!is_connected_) {
     emit ErrorOccurred("Not connected to SSH server");
     return;
   }
@@ -108,8 +108,50 @@ void SSHManager::ExecuteCommand(const QString& command) {
     return;
   }
   
-  QString cmd = command.trimmed() + "\n";
-  ssh_process_->write(cmd.toUtf8());
+  // Create a new SSH process for this command
+  QProcess* cmd_process = new QProcess(this);
+  
+  // Build command
+  QString program;
+  QStringList arguments;
+  
+  if (!password_.isEmpty()) {
+    program = "sshpass";
+    arguments << "-p" << password_
+             << "ssh"
+             << "-o" << "StrictHostKeyChecking=no"
+             << "-o" << "UserKnownHostsFile=/dev/null"
+             << "-o" << "LogLevel=QUIET"
+             << "-p" << QString::number(port_)
+             << QString("%1@%2").arg(username_, host_)
+             << command.trimmed();
+  } else {
+    program = "ssh";
+    arguments << "-o" << "StrictHostKeyChecking=no"
+             << "-o" << "UserKnownHostsFile=/dev/null"
+             << "-o" << "LogLevel=QUIET"
+             << "-p" << QString::number(port_)
+             << QString("%1@%2").arg(username_, host_)
+             << command.trimmed();
+  }
+  
+  // Connect signals for this command
+  connect(cmd_process, &QProcess::readyReadStandardOutput, [this, cmd_process]() {
+    QByteArray data = cmd_process->readAllStandardOutput();
+    QString output = QString::fromUtf8(data);
+    if (!password_.isEmpty()) {
+      output = output.replace(password_, "[PASSWORD HIDDEN]");
+    }
+    emit CommandOutput(output);
+  });
+  
+  connect(cmd_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+          [this, cmd_process, command](int exit_code, QProcess::ExitStatus) {
+    emit CommandFinished(command, exit_code);
+    cmd_process->deleteLater();
+  });
+  
+  cmd_process->start(program, arguments);
 }
 
 void SSHManager::ExecuteCommandAsync(const QString& command) {
@@ -125,13 +167,25 @@ void SSHManager::Reconnect() {}
 void SSHManager::OnProcessFinished(int exit_code, QProcess::ExitStatus exit_status) {
   Q_UNUSED(exit_status)
   
-  is_connected_ = false;
-  connection_state_ = kDisconnected;
-  connection_timer_->stop();
-  StopHeartbeat();
+  qDebug() << "SSH process finished with exit code:" << exit_code << "was connected:" << is_connected_;
   
-  emit ConnectionStateChanged(connection_state_);
-  emit Disconnected();
+  // If we had a successful connection (exit code 0) and we detected the connection, 
+  // keep the "connected" status for the UI but mark process as finished
+  if (exit_code == 0 && is_connected_) {
+    // Successful command execution - keep connected status
+    connection_timer_->stop();
+    qDebug() << "SSH command completed successfully, maintaining connected status";
+  } else {
+    // Connection failed or error occurred
+    is_connected_ = false;
+    connection_state_ = kDisconnected;
+    connection_timer_->stop();
+    StopHeartbeat();
+    
+    emit ConnectionStateChanged(connection_state_);
+    emit Disconnected();
+  }
+  
   emit CommandFinished("SSH session", exit_code);
 }
 
@@ -173,6 +227,13 @@ void SSHManager::OnProcessStarted() {
       }
     });
   }
+  
+  // Send a simple command to test the connection
+  QTimer::singleShot(2000, [this]() {
+    if (ssh_process_ && ssh_process_->state() == QProcess::Running) {
+      ssh_process_->write("echo 'SSH_CONNECTION_READY'; exit 0\n");
+    }
+  });
 }
 
 void SSHManager::OnReadyReadStandardOutput() {
@@ -191,9 +252,11 @@ void SSHManager::OnReadyReadStandardOutput() {
     }
     
     // Check if this looks like a successful connection (MOTD, shell prompt, etc.)
-    if (!is_connected_ && (output.contains("$") || output.contains("#") || 
+    if (!is_connected_ && (output.contains("SSH_CONNECTION_READY") ||
+                          output.contains("$") || output.contains("#") || 
                           output.contains("Welcome") || output.contains("Last login") ||
                           output.contains("Ubuntu") || output.contains("Linux"))) {
+      qDebug() << "SSH connection detected via output pattern";
       is_connected_ = true;
       connection_state_ = kConnected;
       connection_timer_->stop();
@@ -287,20 +350,22 @@ void SSHManager::StartConnection() {
     program = "sshpass";
     arguments << "-p" << password_
              << "ssh"
-             << "-t"  // Allocate a TTY
              << "-o" << "StrictHostKeyChecking=no"
              << "-o" << "UserKnownHostsFile=/dev/null"
              << "-o" << "LogLevel=QUIET"
              << "-o" << "PubkeyAuthentication=no"  // Force password auth
+             << "-o" << "ServerAliveInterval=30"   // Keep connection alive
+             << "-o" << "ServerAliveCountMax=3"    // Max failed keepalives
              << "-p" << QString::number(port_)
              << QString("%1@%2").arg(username_, host_);
   } else {
     // Use regular ssh without password
     program = "ssh";
-    arguments << "-t"  // Allocate a TTY
-             << "-o" << "StrictHostKeyChecking=no"
+    arguments << "-o" << "StrictHostKeyChecking=no"
              << "-o" << "UserKnownHostsFile=/dev/null"
              << "-o" << "LogLevel=QUIET"
+             << "-o" << "ServerAliveInterval=30"   // Keep connection alive
+             << "-o" << "ServerAliveCountMax=3"    // Max failed keepalives
              << "-p" << QString::number(port_)
              << QString("%1@%2").arg(username_, host_);
   }
@@ -315,11 +380,12 @@ void SSHManager::StartConnection() {
       // Fall back to regular SSH with manual password handling
       program = "ssh";
       arguments.clear();
-      arguments << "-t"  // Allocate a TTY
-               << "-o" << "StrictHostKeyChecking=no"
+      arguments << "-o" << "StrictHostKeyChecking=no"
                << "-o" << "UserKnownHostsFile=/dev/null"
                << "-o" << "LogLevel=QUIET"
                << "-o" << "PubkeyAuthentication=no"  // Force password auth
+               << "-o" << "ServerAliveInterval=30"   // Keep connection alive
+               << "-o" << "ServerAliveCountMax=3"    // Max failed keepalives
                << "-p" << QString::number(port_)
                << QString("%1@%2").arg(username_, host_);
       
