@@ -8,6 +8,7 @@
 #include <QRegularExpression>
 #include <QDebug>
 #include <QScrollBar>
+#include <toml++/toml.hpp>
 
 SSHTabWidget::SSHTabWidget(QWidget* parent)
     : QWidget(parent),
@@ -18,6 +19,7 @@ SSHTabWidget::SSHTabWidget(QWidget* parent)
       current_port_(22) {
   
   SetupUI();
+  LoadDefaultsFromConfig();
   
   // Connect SSH manager signals
   connect(ssh_manager_, &SSHManager::Connected, 
@@ -78,7 +80,7 @@ void SSHTabWidget::SetupConnectionArea() {
   address_label_ = new QLabel("SSH Address:", this);
   ssh_address_edit_ = new QLineEdit(this);
   ssh_address_edit_->setPlaceholderText("user@host or user@host -p port");
-  ssh_address_edit_->setText("dingo@turtlebot3");  // Default example
+  // Default will be set from config file
   
   // Connect and disconnect buttons
   connect_button_ = new QPushButton("Connect", this);
@@ -135,14 +137,12 @@ void SSHTabWidget::SetupCommandRows() {
     // Create first dropdown
     command_row.dropdown1 = new QComboBox();
     command_row.dropdown1->setEditable(true);
-    command_row.dropdown1->addItems({"ls", "cd", "pwd", "ps", "top", "df"});
-    command_row.dropdown1->setCurrentText(row == 0 ? "ls" : "ps");
+    // Options will be loaded from config file
     
     // Create second dropdown  
     command_row.dropdown2 = new QComboBox();
     command_row.dropdown2->setEditable(true);
-    command_row.dropdown2->addItems({"-la", "-aux", "-h", "--help", ""});
-    command_row.dropdown2->setCurrentText(row == 0 ? "-la" : "-aux");
+    // Options will be loaded from config file
     
     // Add to grid layout
     grid_layout->addWidget(command_row.button, row, 0);
@@ -343,6 +343,88 @@ void SSHTabWidget::ParseSSHAddress(const QString& address, QString& user,
     if (!match.captured(3).isEmpty()) {
       port = match.captured(3).toInt();
     }
+  }
+}
+
+void SSHTabWidget::LoadDefaultsFromConfig() {
+  try {
+    // Try to load config from file
+    toml::table config;
+    try {
+      config = toml::parse_file("../settings.toml");
+    } catch (const toml::parse_error& err) {
+      try {
+        config = toml::parse_file("settings.toml");
+      } catch (const toml::parse_error& err2) {
+        qWarning() << "Failed to load settings.toml:" << err2.what();
+        return;
+      }
+    }
+    
+    // Load SSH address default
+    if (auto ssh_section = config["ssh"].as_table()) {
+      if (auto default_address = ssh_section->get("default_address")->as_string()) {
+        QString address = QString::fromStdString(default_address->get()).remove('"');
+        ssh_address_edit_->setText(address);
+      }
+      
+      // Load dropdown options
+      QStringList dropdown1_options;
+      QStringList dropdown2_options;
+      
+      if (auto dropdown1_array = ssh_section->get("dropdown1_options")->as_array()) {
+        for (auto&& elem : *dropdown1_array) {
+          if (auto str = elem.as_string()) {
+            dropdown1_options << QString::fromStdString(str->get()).remove('"');
+          }
+        }
+      }
+      
+      if (auto dropdown2_array = ssh_section->get("dropdown2_options")->as_array()) {
+        for (auto&& elem : *dropdown2_array) {
+          if (auto str = elem.as_string()) {
+            dropdown2_options << QString::fromStdString(str->get()).remove('"');
+          }
+        }
+      }
+      
+      // Set fallback options if not found in config
+      if (dropdown1_options.isEmpty()) {
+        dropdown1_options = {"ls", "cd", "pwd", "ps", "top", "df"};
+      }
+      if (dropdown2_options.isEmpty()) {
+        dropdown2_options = {"-la", "-aux", "-h", "--help", ""};
+      }
+      
+      // Populate dropdown options for all command rows
+      for (CommandRow& row : command_rows_) {
+        row.dropdown1->addItems(dropdown1_options);
+        row.dropdown2->addItems(dropdown2_options);
+      }
+      
+      // Load command defaults (after options are populated)
+      if (auto default_commands = ssh_section->get("default_commands")->as_array()) {
+        for (size_t i = 0; i < default_commands->size() && i < command_rows_.size(); ++i) {
+          if (auto cmd_array = default_commands->get(i)->as_array()) {
+            if (cmd_array->size() >= 1) {
+              if (auto cmd1 = cmd_array->get(0)->as_string()) {
+                QString command1 = QString::fromStdString(cmd1->get()).remove('"');
+                command_rows_[i].dropdown1->setCurrentText(command1);
+              }
+            }
+            if (cmd_array->size() >= 2) {
+              if (auto cmd2 = cmd_array->get(1)->as_string()) {
+                QString command2 = QString::fromStdString(cmd2->get()).remove('"');
+                command_rows_[i].dropdown2->setCurrentText(command2);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+  } catch (const std::exception& e) {
+    qWarning() << "Error loading SSH defaults from config:" << e.what();
   }
 }
 

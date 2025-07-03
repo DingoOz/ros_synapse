@@ -33,3 +33,15 @@ default_username = "ubuntu"
 default_port = 22
 use_key_auth = true
 key_file = "~/.ssh/id_rsa"
+
+[ssh]
+# SSH default values
+default_address = "ubuntu@raspberrypi"
+default_commands = [
+    ["watch df", "-h"],
+    ["htop", ""]
+]
+
+# SSH dropdown options
+dropdown1_options = ["ls", "cd", "pwd", "ps", "top", "df", "htop", "watch df", "systemctl", "journalctl", "free", "uptime"]
+dropdown2_options = ["-la", "-aux", "-h", "--help", "", "-f", "-m", "-1", "status", "restart", "stop", "start"]
