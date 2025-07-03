@@ -3,6 +3,7 @@
 
 #include "mainwindow.h"
 #include "commandwidget.h"
+#include "sshtabwidget.h"
 #include "sshmanager.h"
 #include "ros2executor.h"
 #include "processmonitor.h"
@@ -20,12 +21,13 @@
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
       command_widget_(new CommandWidget(this)),
+      ssh_tab_widget_(new SSHTabWidget(this)),
       ssh_manager_(new SSHManager(this)),
       ros2_executor_(new ROS2Executor(this)),
       process_monitor_(new ProcessMonitor(this)),
       config_manager_(new ConfigManager(this)),
-      ros_spin_timer_(new QTimer(this)),
-      status_update_timer_(new QTimer(this)) {
+      status_update_timer_(new QTimer(this)),
+      ros_spin_timer_(new QTimer(this)) {
   
   SetupUI();
   SetupROS2();
@@ -87,6 +89,7 @@ void MainWindow::SetupUI() {
   // Create tab widget for main content
   tab_widget_ = new QTabWidget(this);
   tab_widget_->addTab(command_widget_, "Command Builder");
+  tab_widget_->addTab(ssh_tab_widget_, "SSH Commands");
   
   // Create log display
   log_display_ = new QTextEdit(this);
