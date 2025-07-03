@@ -24,6 +24,7 @@
 #include <rcl_interfaces/msg/log.hpp>
 
 class CommandWidget;
+class SSHTabWidget;
 class SSHManager;
 class ROS2Executor;
 class ProcessMonitor;
@@ -61,6 +62,7 @@ class MainWindow : public QMainWindow {
   QTabWidget* tab_widget_;
   QWidget* quick_launch_tab_;
   CommandWidget* command_widget_;
+  SSHTabWidget* ssh_tab_widget_;
   QWidget* terminal_tab_;
   QWidget* monitor_tab_;
   QWidget* config_tab_;

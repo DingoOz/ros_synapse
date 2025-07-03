@@ -35,6 +35,7 @@ set(SOURCES
   src/main.cpp
   src/mainwindow.cpp
   src/commandwidget.cpp
+  src/sshtabwidget.cpp
   src/sshmanager.cpp
   src/ros2executor.cpp
   src/processmonitor.cpp
@@ -45,6 +46,7 @@ set(SOURCES
 set(HEADERS
   include/mainwindow.h
   include/commandwidget.h
+  include/sshtabwidget.h
   include/sshmanager.h
   include/ros2executor.h
   include/processmonitor.h
