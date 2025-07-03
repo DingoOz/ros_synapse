@@ -27,10 +27,13 @@ MainWindow::MainWindow(QWidget* parent)
       process_monitor_(new ProcessMonitor(this)),
       config_manager_(new ConfigManager(this)),
       status_update_timer_(new QTimer(this)),
-      ros_spin_timer_(new QTimer(this)) {
+      ros_spin_timer_(new QTimer(this)),
+      ssh_connected_(false),
+      ssh_remote_address_("") {
   
   SetupUI();
   SetupROS2();
+  SetupSSHStatusTracking();
   
   // Setup status update timer
   connect(status_update_timer_, &QTimer::timeout, this, &MainWindow::UpdateStatusInfo);
@@ -234,7 +237,7 @@ void MainWindow::SetupStatusRow() {
     "}"
   );
   
-  // Create IPv4 label
+  // Create IPv4 label  
   ipv4_label_ = new QLabel("IPv4: Loading...", this);
   ipv4_label_->setStyleSheet(
     "QLabel { "
@@ -246,9 +249,22 @@ void MainWindow::SetupStatusRow() {
     "}"
   );
   
+  // Create SSH status label
+  ssh_status_label_ = new QLabel("SSH: N/C", this);
+  ssh_status_label_->setStyleSheet(
+    "QLabel { "
+    "  color: #ff6666; "
+    "  font-weight: bold; "
+    "  padding: 2px 8px; "
+    "  background-color: #4a4a4a; "
+    "  border-radius: 3px; "
+    "}"
+  );
+  
   // Add labels to layout
   status_layout->addWidget(domain_id_label_);
   status_layout->addWidget(ipv4_label_);
+  status_layout->addWidget(ssh_status_label_);
   status_layout->addStretch(); // Push labels to the left
 }
 
@@ -257,9 +273,12 @@ void MainWindow::UpdateStatusInfo() {
   QString domain_id = GetRosDomainId();
   domain_id_label_->setText(QString("ROS_DOMAIN_ID: %1").arg(domain_id));
   
-  // Update IPv4 address
+  // Update local IPv4 address
   QString ipv4 = GetLocalIPv4Address();
   ipv4_label_->setText(QString("IPv4: %1").arg(ipv4));
+  
+  // Update SSH connection status
+  UpdateSSHConnectionStatus();
 }
 
 QString MainWindow::GetRosDomainId() {
@@ -300,4 +319,52 @@ QString MainWindow::GetLocalIPv4Address() {
   }
   
   return "Not Available";
+}
+
+void MainWindow::SetupSSHStatusTracking() {
+  // Connect to SSH tab's connection status signals
+  connect(ssh_tab_widget_, &SSHTabWidget::ConnectionStatusChanged,
+          this, &MainWindow::OnSSHConnectionChanged);
+}
+
+void MainWindow::OnSSHConnectionChanged(bool connected) {
+  qDebug() << "SSH connection changed:" << connected;
+  ssh_connected_ = connected;
+  
+  if (connected) {
+    // Extract IP address from SSH tab widget
+    ssh_remote_address_ = ssh_tab_widget_->GetCurrentHost();
+    qDebug() << "SSH connected to:" << ssh_remote_address_;
+  } else {
+    qDebug() << "SSH disconnected";
+    ssh_remote_address_ = "";
+  }
+  
+  UpdateSSHConnectionStatus();
+}
+
+void MainWindow::UpdateSSHConnectionStatus() {
+  if (ssh_connected_ && !ssh_remote_address_.isEmpty()) {
+    ssh_status_label_->setText(QString("SSH: %1").arg(ssh_remote_address_));
+    ssh_status_label_->setStyleSheet(
+      "QLabel { "
+      "  color: #66ff66; "
+      "  font-weight: bold; "
+      "  padding: 2px 8px; "
+      "  background-color: #4a4a4a; "
+      "  border-radius: 3px; "
+      "}"
+    );
+  } else {
+    ssh_status_label_->setText("SSH: N/C");
+    ssh_status_label_->setStyleSheet(
+      "QLabel { "
+      "  color: #ff6666; "
+      "  font-weight: bold; "
+      "  padding: 2px 8px; "
+      "  background-color: #4a4a4a; "
+      "  border-radius: 3px; "
+      "}"
+    );
+  }
 }
