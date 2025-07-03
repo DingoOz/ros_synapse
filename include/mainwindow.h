@@ -1,0 +1,74 @@
+// Copyright 2024 TurtleBot3 Controller Project
+// Licensed under the Apache License, Version 2.0
+//
+// Main application window providing tabbed interface for TurtleBot3 control
+// with SSH management, ROS2 execution, and process monitoring capabilities.
+
+#ifndef ROS_SYNAPSE_INCLUDE_MAINWINDOW_H_
+#define ROS_SYNAPSE_INCLUDE_MAINWINDOW_H_
+
+#include <QMainWindow>
+#include <QTabWidget>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QSplitter>
+#include <QTextEdit>
+#include <QStatusBar>
+#include <QMenuBar>
+#include <QAction>
+#include <QTimer>
+
+class CommandWidget;
+class SSHManager;
+class ROS2Executor;
+class ProcessMonitor;
+class ConfigManager;
+
+class MainWindow : public QMainWindow {
+  Q_OBJECT
+
+ public:
+  MainWindow(QWidget* parent = nullptr);
+  ~MainWindow();
+
+ private slots:
+  void OnConnectionStatusChanged(bool connected);
+  void OnCommandExecuted(const QString& command, const QString& output);
+  void OnProcessStatusChanged(const QString& process, const QString& status);
+  void UpdateStatusBar();
+  void ShowAbout();
+  void ShowSettings();
+
+ private:
+  void SetupUI();
+  void SetupMenuBar();
+  void SetupStatusBar();
+  void SetupConnections();
+  void SetupTheme();
+
+  QTabWidget* tab_widget_;
+  QWidget* quick_launch_tab_;
+  CommandWidget* command_widget_;
+  QWidget* terminal_tab_;
+  QWidget* monitor_tab_;
+  QWidget* config_tab_;
+  
+  QTextEdit* output_display_;
+  QSplitter* main_splitter_;
+  
+  SSHManager* ssh_manager_;
+  ROS2Executor* ros2_executor_;
+  ProcessMonitor* process_monitor_;
+  ConfigManager* config_manager_;
+  
+  QTimer* status_timer_;
+  QStatusBar* status_bar_;
+  
+  QAction* connect_action_;
+  QAction* disconnect_action_;
+  QAction* settings_action_;
+  QAction* about_action_;
+  QAction* quit_action_;
+};
+
+#endif  // ROS_SYNAPSE_INCLUDE_MAINWINDOW_H_
