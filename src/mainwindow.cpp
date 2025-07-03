@@ -93,7 +93,11 @@ void MainWindow::SetupUI() {
   log_display_->setMaximumHeight(200);
   log_display_->setReadOnly(true);
   log_display_->setPlaceholderText("ROS2 log messages will appear here...");
-  log_display_->setStyleSheet("QTextEdit { background-color: #2b2b2b; color: #ffffff; }");
+  log_display_->setStyleSheet(
+    "QTextEdit { background-color: #2b2b2b; color: #ffffff; }"
+    "QToolTip { color: #ffffff; background-color: #333333; border: 1px solid #666666; padding: 4px; border-radius: 3px; }"
+  );
+  log_display_->setToolTip("/rosout");
   
   // Add widgets to main layout
   main_layout->addWidget(tab_widget_, 1); // Tab widget takes most space
