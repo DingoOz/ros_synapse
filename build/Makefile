@@ -65,6 +65,16 @@ CMAKE_BINARY_DIR = /home/dingo/Programming/ros_synapse/build
 #=============================================================================
 # Targets provided globally by CMake.
 
+# Special rule for the target test
+test:
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "Running tests..."
+	/usr/bin/ctest --force-new-ctest-process $(ARGS)
+.PHONY : test
+
+# Special rule for the target test
+test/fast: test
+.PHONY : test/fast
+
 # Special rule for the target edit_cache
 edit_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --cyan "No interactive CMake dialog available..."
@@ -160,6 +170,32 @@ preinstall/fast:
 depend:
 	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
+
+#=============================================================================
+# Target rules for targets named uninstall
+
+# Build rule for target.
+uninstall: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 uninstall
+.PHONY : uninstall
+
+# fast build rule for target.
+uninstall/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uninstall.dir/build.make CMakeFiles/uninstall.dir/build
+.PHONY : uninstall/fast
+
+#=============================================================================
+# Target rules for targets named ros_synapse_uninstall
+
+# Build rule for target.
+ros_synapse_uninstall: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ros_synapse_uninstall
+.PHONY : ros_synapse_uninstall
+
+# fast build rule for target.
+ros_synapse_uninstall/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ros_synapse_uninstall.dir/build.make CMakeFiles/ros_synapse_uninstall.dir/build
+.PHONY : ros_synapse_uninstall/fast
 
 #=============================================================================
 # Target rules for targets named ros_synapse
@@ -404,8 +440,11 @@ help:
 	@echo "... install/strip"
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
+	@echo "... test"
 	@echo "... ros_synapse_autogen"
 	@echo "... ros_synapse_autogen_timestamp_deps"
+	@echo "... ros_synapse_uninstall"
+	@echo "... uninstall"
 	@echo "... ros_synapse"
 	@echo "... ros_synapse_autogen/mocs_compilation.o"
 	@echo "... ros_synapse_autogen/mocs_compilation.i"

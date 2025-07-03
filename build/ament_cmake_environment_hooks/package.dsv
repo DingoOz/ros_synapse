@@ -1,4 +1,4 @@
-source;share/turtlebot3_controller/local_setup.bash
-source;share/turtlebot3_controller/local_setup.dsv
-source;share/turtlebot3_controller/local_setup.sh
-source;share/turtlebot3_controller/local_setup.zsh
+source;share/ros_synapse/local_setup.bash
+source;share/ros_synapse/local_setup.dsv
+source;share/ros_synapse/local_setup.sh
+source;share/ros_synapse/local_setup.zsh

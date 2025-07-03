@@ -154,6 +154,7 @@
 #define __MMX_WITH_SSE__ 1
 #define __LDBL_HAS_DENORM__ 1
 #define QT_WIDGETS_LIB 1
+#define FASTCDR_DYN_LINK 1
 #define __SEG_GS 1
 #define __BFLT16_EPSILON__ 7.81250000000000000000000000000000000e-3BF16
 #define __cplusplus 201703L
@@ -410,6 +411,7 @@
 #define __UINT64_TYPE__ long unsigned int
 #define __UINT32_C(c) c ## U
 #define __cpp_alias_templates 200704L
+#define DEFAULT_RMW_IMPLEMENTATION rmw_fastrtps_cpp
 #define __FLT_DENORM_MIN__ 1.40129846432481707092372958328991613e-45F
 #define __FLT128_IS_IEC_60559__ 1
 #define __INT8_MAX__ 0x7f

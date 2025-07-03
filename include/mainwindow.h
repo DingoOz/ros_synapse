@@ -17,6 +17,8 @@
 #include <QMenuBar>
 #include <QAction>
 #include <QTimer>
+#include <rclcpp/rclcpp.hpp>
+#include <rcl_interfaces/msg/log.hpp>
 
 class CommandWidget;
 class SSHManager;
@@ -38,6 +40,7 @@ class MainWindow : public QMainWindow {
   void UpdateStatusBar();
   void ShowAbout();
   void ShowSettings();
+  void OnLogMessageReceived(const rcl_interfaces::msg::Log::SharedPtr msg);
 
  private:
   void SetupUI();
@@ -45,6 +48,8 @@ class MainWindow : public QMainWindow {
   void SetupStatusBar();
   void SetupConnections();
   void SetupTheme();
+  void SetupROS2();
+  void AppendLogMessage(const QString& message, const QString& level);
 
   QTabWidget* tab_widget_;
   QWidget* quick_launch_tab_;
@@ -54,7 +59,9 @@ class MainWindow : public QMainWindow {
   QWidget* config_tab_;
   
   QTextEdit* output_display_;
+  QTextEdit* log_display_;
   QSplitter* main_splitter_;
+  QWidget* central_widget_;
   
   SSHManager* ssh_manager_;
   ROS2Executor* ros2_executor_;
@@ -69,6 +76,12 @@ class MainWindow : public QMainWindow {
   QAction* settings_action_;
   QAction* about_action_;
   QAction* quit_action_;
+  
+  // ROS2 components
+  rclcpp::Node::SharedPtr ros_node_;
+  rclcpp::Subscription<rcl_interfaces::msg::Log>::SharedPtr log_subscription_;
+  std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> executor_;
+  QTimer* ros_spin_timer_;
 };
 
 #endif  // ROS_SYNAPSE_INCLUDE_MAINWINDOW_H_
