@@ -16,6 +16,7 @@
 #include <QScrollBar>
 #include <QNetworkInterface>
 #include <QHostAddress>
+#include <QMessageBox>
 #include <cstdlib>
 
 MainWindow::MainWindow(QWidget* parent)
@@ -33,9 +34,11 @@ MainWindow::MainWindow(QWidget* parent)
       current_executing_row_(-1) {
   
   SetupUI();
+  SetupMenuBar();
   SetupROS2();
   SetupSSHStatusTracking();
   SetupCommandExecution();
+  SetupKeyboardShortcuts();
   
   // Setup status update timer
   connect(status_update_timer_, &QTimer::timeout, this, &MainWindow::UpdateStatusInfo);
@@ -68,11 +71,101 @@ void MainWindow::OnProcessStatusChanged(const QString& process, const QString& s
 
 void MainWindow::UpdateStatusBar() {}
 
-void MainWindow::ShowAbout() {}
+void MainWindow::ShowHelp() {
+  QMessageBox help_dialog(this);
+  help_dialog.setWindowTitle("Keyboard Shortcuts - ROS Synapse");
+  help_dialog.setIcon(QMessageBox::Information);
+  
+  QString help_text = 
+    "<h3>Keyboard Shortcuts</h3>"
+    "<table cellpadding='8'>"
+    "<tr><td><b>Alt+1</b></td><td>Switch to Command Builder tab</td></tr>"
+    "<tr><td><b>Alt+2</b></td><td>Switch to SSH Commands tab</td></tr>"
+    "<tr><td><b>Ctrl+C</b></td><td>Copy selected text (in log window)</td></tr>"
+    "<tr><td><b>F1</b></td><td>Show this help dialog</td></tr>"
+    "</table>"
+    "<br>"
+    "<h3>Command Builder Tab</h3>"
+    "<ul>"
+    "<li>Use the four rows to build and execute ROS2 commands</li>"
+    "<li>Set working directory and setup.bash file in Configuration section</li>"
+    "<li>Click <b>Ctrl+C</b> buttons to terminate running processes</li>"
+    "</ul>"
+    "<br>"
+    "<h3>SSH Commands Tab</h3>"
+    "<ul>"
+    "<li>Connect to remote ROS2 systems via SSH</li>"
+    "<li>Execute commands on remote systems with automatic setup.bash sourcing</li>"
+    "<li>Use <b>Open Terminal</b> to launch a separate SSH terminal</li>"
+    "<li>Click <b>Ctrl+C</b> buttons to interrupt remote commands</li>"
+    "</ul>";
+  
+  help_dialog.setText(help_text);
+  help_dialog.setStandardButtons(QMessageBox::Ok);
+  help_dialog.exec();
+}
+
+void MainWindow::ShowAbout() {
+  QMessageBox about_dialog(this);
+  about_dialog.setWindowTitle("About ROS Synapse");
+  about_dialog.setIcon(QMessageBox::Information);
+  
+  QString about_text = 
+    "<h2>ROS Synapse</h2>"
+    "<p><b>Version:</b> 1.0.0</p>"
+    "<p><b>Built:</b> " + QString(__DATE__) + " " + QString(__TIME__) + "</p>"
+    "<br>"
+    "<p><b>Description:</b></p>"
+    "<p>ROS Synapse is a comprehensive Qt6-based GUI application for managing and monitoring ROS2 systems. "
+    "It provides both local and remote command execution capabilities with real-time logging and process management.</p>"
+    "<br>"
+    "<p><b>Key Features:</b></p>"
+    "<ul>"
+    "<li>Command Builder with configurable ROS2 command rows</li>"
+    "<li>SSH-based remote system management</li>"
+    "<li>Real-time ROS2 log monitoring (/rosout subscription)</li>"
+    "<li>Process lifecycle management with termination controls</li>"
+    "<li>Automatic setup.bash sourcing for workspace environments</li>"
+    "<li>Dark theme UI with customizable settings</li>"
+    "</ul>"
+    "<br>"
+    "<p><b>Created by:</b> Nigel Hungerford-Symes</p>"
+    "<p><b>Copyright:</b> 2025 Nigel Hungerford-Symes</p>"
+    "<p><b>License:</b> MIT License</p>"
+    "<br>"
+    "<p><b>ROS2 Distribution:</b> Jazzy</p>"
+    "<p><b>Qt Version:</b> " + QString(QT_VERSION_STR) + "</p>";
+  
+  about_dialog.setText(about_text);
+  about_dialog.setStandardButtons(QMessageBox::Ok);
+  about_dialog.exec();
+}
 
 void MainWindow::ShowSettings() {}
 
-void MainWindow::SetupMenuBar() {}
+void MainWindow::SetupMenuBar() {
+  // Create the menu bar
+  QMenuBar* menu_bar = menuBar();
+  
+  // Create Help menu
+  QMenu* help_menu = menu_bar->addMenu("&Help");
+  
+  // Create Help action (keyboard shortcuts)
+  help_action_ = new QAction("&Keyboard Shortcuts", this);
+  help_action_->setShortcut(QKeySequence::HelpContents);
+  help_action_->setStatusTip("Show keyboard shortcuts");
+  connect(help_action_, &QAction::triggered, this, &MainWindow::ShowHelp);
+  help_menu->addAction(help_action_);
+  
+  // Add separator
+  help_menu->addSeparator();
+  
+  // Create About action
+  about_action_ = new QAction("&About ROS Synapse", this);
+  about_action_->setStatusTip("Show information about ROS Synapse");
+  connect(about_action_, &QAction::triggered, this, &MainWindow::ShowAbout);
+  help_menu->addAction(about_action_);
+}
 
 void MainWindow::SetupStatusBar() {}
 
@@ -456,4 +549,22 @@ void MainWindow::OnCommandReady(const QString& command, int row) {
   
   // Execute command via ROS2 executor
   ros2_executor_->ExecuteCommand(command);
+}
+
+void MainWindow::SetupKeyboardShortcuts() {
+  // Create Alt+1 shortcut for Command Builder tab
+  command_builder_shortcut_ = new QShortcut(QKeySequence("Alt+1"), this);
+  connect(command_builder_shortcut_, &QShortcut::activated, [this]() {
+    tab_widget_->setCurrentIndex(0); // Command Builder is index 0
+    AppendLogMessage("Switched to Command Builder tab (Alt+1)", "INFO");
+  });
+  
+  // Create Alt+2 shortcut for SSH Commands tab
+  ssh_commands_shortcut_ = new QShortcut(QKeySequence("Alt+2"), this);
+  connect(ssh_commands_shortcut_, &QShortcut::activated, [this]() {
+    tab_widget_->setCurrentIndex(1); // SSH Commands is index 1
+    AppendLogMessage("Switched to SSH Commands tab (Alt+2)", "INFO");
+  });
+  
+  qDebug() << "Keyboard shortcuts setup: Alt+1 for Command Builder, Alt+2 for SSH Commands";
 }
