@@ -34,6 +34,7 @@ class CommandWidget : public QWidget {
   explicit CommandWidget(QWidget* parent = nullptr);
   
   QString GetWorkingDirectory() const;
+  QString GetSetupBashFile() const;
   void SetRowProcessId(int row, const QString& process_id);
   void ClearRowProcessId(int row);
 
@@ -41,6 +42,7 @@ class CommandWidget : public QWidget {
   void CommandReady(const QString& command, int row);
   void CommandExecuted(const QString& command, const QString& output);
   void WorkingDirectoryChanged(const QString& directory);
+  void SetupBashFileChanged(const QString& setup_file);
   void StopProcessRequested(const QString& process_id);
 
  private slots:
@@ -54,6 +56,7 @@ class CommandWidget : public QWidget {
   void OnLoadTemplate();
   void OnClearParameters();
   void OnWorkingDirectoryButtonClicked();
+  void OnSetupBashButtonClicked();
   void OnStopButtonClicked(int row);
 
  private:
@@ -75,6 +78,7 @@ class CommandWidget : public QWidget {
   void SetParameterValues(const QJsonObject& parameters);
   void OnControlRowButtonClicked(int row);
   void LoadWorkingDirectoryFromConfig();
+  void LoadSetupBashFromConfig();
 
   QVBoxLayout* main_layout_;
   QGroupBox* quick_launch_group_;
@@ -104,6 +108,10 @@ class CommandWidget : public QWidget {
   QGroupBox* working_directory_group_;
   QLineEdit* working_directory_edit_;
   QPushButton* working_directory_button_;
+  
+  // Setup bash controls
+  QLineEdit* setup_bash_edit_;
+  QPushButton* setup_bash_button_;
   
   QList<QPushButton*> quick_launch_buttons_;
   QList<QWidget*> parameter_widgets_;

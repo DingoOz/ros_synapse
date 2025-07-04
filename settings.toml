@@ -7,7 +7,7 @@ font_family = "Ubuntu Mono"
 
 [controls]
 # Default options for the 3-row control widget
-row1_dropdown1_options = ["ros2 launch xbox_teleop_stamped.launch.py", "", "", ""]
+row1_dropdown1_options = ["ros2 launch xbox_teleop_stamped.launch.py", "ros2 run teleop_twist_joy teleop_node", "", ""]
 row1_dropdown1_default = "ros2 launch xbox_teleop_stamped.launch.py"
 row1_dropdown2_options = [""]
 row1_dropdown2_default = ""
@@ -22,8 +22,8 @@ row3_dropdown1_default = "ros2 launch turtlebot3_navigation2 navigation2.launch.
 row3_dropdown2_options = ["params_file:=/home/dingo/Programming/tb3_autonomy/src/turtlebot3/turtlebot3_bringup/param/burger_nav_basic.yaml", "params_file:=/home/dingo/Programming/tb3_autonomy/src/turtlebot3/turtlebot3_bringup/param/burger_nav_improved.yaml", "  "]
 row3_dropdown2_default = "params_file:=/home/dingo/Programming/tb3_autonomy/src/turtlebot3/turtlebot3_bringup/param/burger_nav_improved.yaml"
 
-row4_dropdown1_options = ["source install/setup.bash", "rqt", "ros2 topic list"]
-row4_dropdown1_default = "source install/setup.bash"
+row4_dropdown1_options = ["bash install/setup.bash", "rqt", "ros2 topic list"]
+row4_dropdown1_default = "bash install/setup.bash"
 row4_dropdown2_options = [""]
 row4_dropdown2_default = ""
 
@@ -32,10 +32,11 @@ workspace = "~/ros2_ws"
 domain_id = 0
 turtlebot3_model = "burger"
 working_directory = "~/Programming/tb3_autonomy"
+setup_bash_file = "~/Programming/tb3_autonomy/install/setup.bash"
 
 [connection]
-default_host = "192.168.1.100"
-default_username = "ubuntu"
+default_host = "192.168.1.213"
+default_username = "dingo"
 default_port = 22
 use_key_auth = true
 key_file = "~/.ssh/id_rsa"
@@ -43,8 +44,9 @@ key_file = "~/.ssh/id_rsa"
 [ssh]
 # SSH default values
 default_address = "dingo@turtlebot3"
+setup_bash_file = "~/tb3_autonomy/install/setup.bash"
 default_commands = [
-    ["watch df", "-h"],
+    ["ros2 launch dingo.robot.launch.py", ""],
     ["htop", ""]
 ]
 

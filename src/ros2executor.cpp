@@ -3,6 +3,7 @@
 
 #include "ros2executor.h"
 #include <QDir>
+#include <QFile>
 
 ROS2Executor::ROS2Executor(QObject* parent)
     : QObject(parent),
@@ -33,6 +34,11 @@ void ROS2Executor::SetRemoteConnection(const QString& host, const QString& usern
 void ROS2Executor::SetWorkingDirectory(const QString& directory) {
   working_directory_ = directory;
   qDebug() << "ROS2Executor working directory set to:" << working_directory_;
+}
+
+void ROS2Executor::SetSetupBashFile(const QString& setup_file) {
+  setup_bash_file_ = setup_file;
+  qDebug() << "ROS2Executor setup.bash file set to:" << setup_bash_file_;
 }
 
 bool ROS2Executor::IsROS2Available() const {
@@ -84,8 +90,29 @@ void ROS2Executor::ExecuteCommand(const QString& command) {
     process->setEnvironment(env);
   }
   
-  // Parse command - handle GUI applications that need to be detached
-  QStringList args = command.split(' ', Qt::SkipEmptyParts);
+  // Build the final command with setup.bash sourcing if available
+  QString final_command = command;
+  
+  // If setup.bash file is set, wrap command to source it first
+  if (!setup_bash_file_.isEmpty()) {
+    QString expanded_setup = setup_bash_file_;
+    // Expand ~ to home directory
+    if (expanded_setup.startsWith("~/")) {
+      expanded_setup = QDir::homePath() + expanded_setup.mid(1);
+    }
+    
+    // Check if setup.bash file exists
+    if (QFile::exists(expanded_setup)) {
+      final_command = QString("bash -c \"source %1 && %2\"")
+                      .arg(expanded_setup)
+                      .arg(command);
+    } else {
+      emit CommandOutput(QString("Warning: Setup.bash file not found: %1").arg(expanded_setup));
+    }
+  }
+  
+  // Parse final command - handle GUI applications that need to be detached
+  QStringList args = final_command.split(' ', Qt::SkipEmptyParts);
   if (args.isEmpty()) {
     delete process;
     running_processes_.remove(process_id);
@@ -96,18 +123,26 @@ void ROS2Executor::ExecuteCommand(const QString& command) {
   QString program = args.takeFirst();
   
   // For GUI applications like rviz2, use detached process
-  if (program == "rviz2" || program.contains("rviz") || 
+  if (command.contains("rviz2") || command.contains("rviz") || 
       command.contains("gazebo") || command.contains("rqt")) {
     
     emit CommandOutput(QString("Starting GUI application: %1").arg(command));
     emit CommandStarted(command, process_id);
     
-    // Start detached process for GUI applications
-    bool started = QProcess::startDetached(program, args);
-    if (started) {
-      emit CommandOutput(QString("GUI application started successfully: %1").arg(program));
+    // For GUI applications, use the final_command with setup.bash if available
+    bool started;
+    if (final_command != command) {
+      // Using setup.bash wrapper - need to execute through shell
+      started = QProcess::startDetached("bash", QStringList() << "-c" << final_command);
     } else {
-      emit CommandError(QString("Failed to start GUI application: %1").arg(program));
+      // Direct execution
+      started = QProcess::startDetached(program, args);
+    }
+    
+    if (started) {
+      emit CommandOutput(QString("GUI application started successfully: %1").arg(command));
+    } else {
+      emit CommandError(QString("Failed to start GUI application: %1").arg(command));
     }
     
     // Clean up the process since we're using detached
@@ -149,8 +184,14 @@ void ROS2Executor::ExecuteCommand(const QString& command) {
     }
   });
   
-  // Start the process
-  process->start(program, args);
+  // Start the process - use shell execution if setup.bash is being used
+  if (final_command != command) {
+    // Using setup.bash wrapper - execute through shell
+    process->start("bash", QStringList() << "-c" << final_command);
+  } else {
+    // Direct execution
+    process->start(program, args);
+  }
   
   if (!process->waitForStarted(5000)) {
     emit CommandError(QString("Failed to start command: %1").arg(command));

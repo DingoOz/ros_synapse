@@ -224,3 +224,33 @@ QString ConfigManager::GetROS2WorkingDirectory() const {
   }
   return "~/Programming/tb3_autonomy"; // Default value
 }
+
+QString ConfigManager::GetSetupBashFile() const {
+  try {
+    if (auto ros2 = toml_config_["ros2"]) {
+      if (auto setup_bash = ros2["setup_bash_file"]) {
+        if (setup_bash.is_string()) {
+          return QString::fromStdString(setup_bash.as_string()->get());
+        }
+      }
+    }
+  } catch (const std::exception& e) {
+    qWarning() << "Error reading setup bash file setting:" << e.what();
+  }
+  return "~/Programming/tb3_autonomy/install/setup.bash"; // Default value
+}
+
+QString ConfigManager::GetSSHSetupBashFile() const {
+  try {
+    if (auto ssh = toml_config_["ssh"]) {
+      if (auto setup_bash = ssh["setup_bash_file"]) {
+        if (setup_bash.is_string()) {
+          return QString::fromStdString(setup_bash.as_string()->get());
+        }
+      }
+    }
+  } catch (const std::exception& e) {
+    qWarning() << "Error reading SSH setup bash file setting:" << e.what();
+  }
+  return "~/dingo_ws/install/setup.bash"; // Default value
+}

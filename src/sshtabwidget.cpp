@@ -58,6 +58,13 @@ QString SSHTabWidget::GetCurrentHost() const {
   return current_host_;
 }
 
+QString SSHTabWidget::GetSetupBashFile() const {
+  if (!setup_bash_edit_) {
+    return QString();
+  }
+  return setup_bash_edit_->text();
+}
+
 void SSHTabWidget::SetupUI() {
   QVBoxLayout* main_layout = new QVBoxLayout(this);
   
@@ -88,8 +95,11 @@ void SSHTabWidget::SetupUI() {
 }
 
 void SSHTabWidget::SetupConnectionArea() {
-  connection_group_ = new QGroupBox("SSH Connection", this);
-  QHBoxLayout* connection_layout = new QHBoxLayout(connection_group_);
+  connection_group_ = new QGroupBox("SSH Configuration", this);
+  QVBoxLayout* main_connection_layout = new QVBoxLayout(connection_group_);
+  
+  // First row: SSH address and controls
+  QHBoxLayout* address_layout = new QHBoxLayout();
   
   // SSH address label and input
   address_label_ = new QLabel("SSH Address:", this);
@@ -118,13 +128,36 @@ void SSHTabWidget::SetupConnectionArea() {
     "}"
   );
   
-  // Add widgets to layout
-  connection_layout->addWidget(address_label_);
-  connection_layout->addWidget(ssh_address_edit_, 1);
-  connection_layout->addWidget(connect_button_);
-  connection_layout->addWidget(disconnect_button_);
-  connection_layout->addWidget(terminal_button_);
-  connection_layout->addWidget(status_label_);
+  // Add widgets to address layout
+  address_layout->addWidget(address_label_);
+  address_layout->addWidget(ssh_address_edit_, 1);
+  address_layout->addWidget(connect_button_);
+  address_layout->addWidget(disconnect_button_);
+  address_layout->addWidget(terminal_button_);
+  address_layout->addWidget(status_label_);
+  
+  // Second row: Setup.bash configuration
+  QHBoxLayout* setup_layout = new QHBoxLayout();
+  
+  QLabel* setup_label = new QLabel("Setup.bash:", this);
+  setup_bash_edit_ = new QLineEdit(this);
+  setup_bash_edit_->setPlaceholderText("Enter remote setup.bash file path...");
+  setup_bash_edit_->setMinimumWidth(400);
+  
+  setup_bash_button_ = new QPushButton("Browse", this);
+  setup_bash_button_->setMinimumWidth(100);
+  setup_bash_button_->setEnabled(false); // Disabled until connected
+  
+  setup_layout->addWidget(setup_label);
+  setup_layout->addWidget(setup_bash_edit_, 1);
+  setup_layout->addWidget(setup_bash_button_);
+  
+  // Add both layouts to main layout
+  main_connection_layout->addLayout(address_layout);
+  main_connection_layout->addLayout(setup_layout);
+  
+  // Load setup.bash default value
+  LoadSetupBashFromConfig();
   
   // Connect signals
   connect(connect_button_, &QPushButton::clicked,
@@ -135,6 +168,8 @@ void SSHTabWidget::SetupConnectionArea() {
           this, &SSHTabWidget::OnTerminalButtonClicked);
   connect(ssh_address_edit_, &QLineEdit::textChanged,
           this, &SSHTabWidget::OnSSHAddressChanged);
+  connect(setup_bash_button_, &QPushButton::clicked,
+          this, &SSHTabWidget::OnSetupBashButtonClicked);
   
   // Allow Enter key to trigger connect when address field has focus
   connect(ssh_address_edit_, &QLineEdit::returnPressed, [this]() {
@@ -265,13 +300,30 @@ void SSHTabWidget::OnCommandRowButtonClicked(int row) {
     full_command += " " + command2;
   }
   
-  output_display_->append(QString("=== Executing SSH Command ==="));
-  output_display_->append(QString("Command: %1").arg(full_command));
+  // Check if setup.bash file is configured and wrap command if needed
+  QString setup_bash_file = setup_bash_edit_->text().trimmed();
+  QString final_command = full_command;
+  
+  if (!setup_bash_file.isEmpty()) {
+    // Wrap command to source setup.bash first
+    final_command = QString("bash -c \"source %1 && %2\"")
+                    .arg(setup_bash_file)
+                    .arg(full_command);
+    
+    output_display_->append(QString("=== Executing SSH Command with Setup.bash ==="));
+    output_display_->append(QString("Setup.bash: %1").arg(setup_bash_file));
+    output_display_->append(QString("Original Command: %1").arg(full_command));
+    output_display_->append(QString("Final Command: %1").arg(final_command));
+  } else {
+    output_display_->append(QString("=== Executing SSH Command ==="));
+    output_display_->append(QString("Command: %1").arg(full_command));
+  }
+  
   output_display_->append(QString("Row: %1").arg(row + 1));
   output_display_->append(QString("SSH Target: %1@%2:%3").arg(current_user_, current_host_).arg(current_port_));
   output_display_->append("=============================");
-  output_display_->append(QString("$ %1").arg(full_command));
-  ssh_manager_->ExecuteCommand(full_command);
+  output_display_->append(QString("$ %1").arg(final_command));
+  ssh_manager_->ExecuteCommand(final_command);
 }
 
 void SSHTabWidget::OnSSHConnectionStatusChanged(bool connected) {
@@ -288,6 +340,9 @@ void SSHTabWidget::OnSSHConnectionStatusChanged(bool connected) {
   
   // Enable/disable terminal button
   terminal_button_->setEnabled(connected);
+  
+  // Enable/disable setup.bash button
+  setup_bash_button_->setEnabled(connected);
   
   UpdateStatusLabel();
   emit ConnectionStatusChanged(connected);
@@ -712,4 +767,46 @@ void SSHTabWidget::PollSSHConnection() {
   
   qDebug() << "Executing SSH poll command:" << program << arguments.join(" ");
   poll_process->start(program, arguments);
+}
+
+void SSHTabWidget::LoadSetupBashFromConfig() {
+  try {
+    // Try to load config from file
+    toml::table config;
+    try {
+      config = toml::parse_file("../settings.toml");
+    } catch (const toml::parse_error& err) {
+      try {
+        config = toml::parse_file("settings.toml");
+      } catch (const toml::parse_error& err2) {
+        qWarning() << "Failed to load settings.toml:" << err2.what();
+        return;
+      }
+    }
+    
+    // Load SSH setup.bash default
+    if (auto ssh_section = config["ssh"].as_table()) {
+      if (auto setup_bash = ssh_section->get("setup_bash_file")->as_string()) {
+        QString setup_file = QString::fromStdString(setup_bash->get()).remove('"');
+        setup_bash_edit_->setText(setup_file);
+      }
+    }
+  } catch (const std::exception& e) {
+    qWarning() << "Error loading SSH setup.bash from config:" << e.what();
+  }
+}
+
+void SSHTabWidget::OnSetupBashButtonClicked() {
+  // For SSH, this would typically be a remote file browser
+  // For now, we'll allow manual editing since browsing remote files is complex
+  // In a future version, this could open a remote file browser when connected
+  
+  if (!is_connected_) {
+    // If not connected, show a message that this is for remote files
+    output_display_->append("Note: Setup.bash path should be a path on the remote server (e.g., ~/ros2_ws/install/setup.bash)");
+    return;
+  }
+  
+  // TODO: Implement remote file browsing when connected
+  output_display_->append("Remote file browsing not yet implemented. Please enter the path manually.");
 }

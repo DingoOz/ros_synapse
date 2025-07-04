@@ -98,18 +98,25 @@ void MainWindow::SetupUI() {
   
   // Create log display
   log_display_ = new QTextEdit(this);
-  log_display_->setMaximumHeight(200);
+  log_display_->setMinimumHeight(300);  // ~15 lines of text minimum
+  log_display_->setMaximumHeight(400);  // Cap it so it doesn't get too large
   log_display_->setReadOnly(true);
   log_display_->setPlaceholderText("ROS2 log messages will appear here...");
+  
+  // Enable text selection and copying
+  log_display_->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+  log_display_->setCursorWidth(1);  // Show text cursor for selection
+  
   log_display_->setStyleSheet(
     "QTextEdit { background-color: #2b2b2b; color: #ffffff; }"
+    "QTextEdit::selection { background-color: #0078d4; color: #ffffff; }"  // Selection highlight
     "QToolTip { color: #ffffff; background-color: #333333; border: 1px solid #666666; padding: 4px; border-radius: 3px; }"
   );
-  log_display_->setToolTip("/rosout");
+  log_display_->setToolTip("/rosout - Click and drag to select text, Ctrl+C to copy");
   
-  // Add widgets to main layout
-  main_layout->addWidget(tab_widget_, 1); // Tab widget takes most space
-  main_layout->addWidget(log_display_);   // Log display at bottom
+  // Add widgets to main layout with proper sizing
+  main_layout->addWidget(tab_widget_, 2); // Tab widget gets 2/3 of space
+  main_layout->addWidget(log_display_, 1);   // Log display gets 1/3 of space
 }
 
 void MainWindow::SetupROS2() {
@@ -380,6 +387,13 @@ void MainWindow::SetupCommandExecution() {
     AppendLogMessage(QString("Working directory changed to: %1").arg(directory), "INFO");
   });
   
+  // Connect setup.bash file changes
+  connect(command_widget_, &CommandWidget::SetupBashFileChanged,
+          this, [this](const QString& setup_file) {
+    ros2_executor_->SetSetupBashFile(setup_file);
+    AppendLogMessage(QString("Setup.bash file changed to: %1").arg(setup_file), "INFO");
+  });
+  
   // Connect stop process requests
   connect(command_widget_, &CommandWidget::StopProcessRequested,
           this, [this](const QString& process_id) {
@@ -391,6 +405,12 @@ void MainWindow::SetupCommandExecution() {
   QString initial_wd = command_widget_->GetWorkingDirectory();
   if (!initial_wd.isEmpty()) {
     ros2_executor_->SetWorkingDirectory(initial_wd);
+  }
+  
+  // Set initial setup.bash file
+  QString initial_setup = command_widget_->GetSetupBashFile();
+  if (!initial_setup.isEmpty()) {
+    ros2_executor_->SetSetupBashFile(initial_setup);
   }
   
   // Connect ROS2 executor output to log display (use overloaded signals)

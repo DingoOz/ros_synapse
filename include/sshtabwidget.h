@@ -30,6 +30,7 @@ class SSHTabWidget : public QWidget {
   ~SSHTabWidget();
   
   QString GetCurrentHost() const;
+  QString GetSetupBashFile() const;
 
  signals:
   void CommandExecuted(const QString& command, const QString& output);
@@ -40,6 +41,7 @@ class SSHTabWidget : public QWidget {
   void OnDisconnectButtonClicked();
   void OnTerminalButtonClicked();
   void OnSSHAddressChanged();
+  void OnSetupBashButtonClicked();
   void OnCommandRowButtonClicked(int row);
   void OnSSHConnectionStatusChanged(bool connected);
   void OnSSHCommandOutput(const QString& output);
@@ -52,6 +54,7 @@ class SSHTabWidget : public QWidget {
   void SetupConnectionArea();
   void SetupCommandRows();
   void LoadDefaultsFromConfig();
+  void LoadSetupBashFromConfig();
   void UpdateStatusLabel();
   void ParseSSHAddress(const QString& address, QString& user, QString& host, 
                        int& port);
@@ -71,6 +74,10 @@ class SSHTabWidget : public QWidget {
   QPushButton* disconnect_button_;
   QPushButton* terminal_button_;
   QLabel* status_label_;
+  
+  // Setup bash controls
+  QLineEdit* setup_bash_edit_;
+  QPushButton* setup_bash_button_;
 
   // Command rows widgets
   QGroupBox* command_rows_group_;

@@ -43,6 +43,7 @@ class ROS2Executor : public QObject {
   void SetTurtleBot3Model(const QString& model);
   void SetRemoteConnection(const QString& host, const QString& username);
   void SetWorkingDirectory(const QString& directory);
+  void SetSetupBashFile(const QString& setup_file);
   
   bool IsROS2Available() const;
   QStringList GetAvailablePackages() const;
@@ -103,6 +104,7 @@ class ROS2Executor : public QObject {
   QString remote_host_;
   QString remote_username_;
   QString working_directory_;
+  QString setup_bash_file_;
   
   QMap<QString, ProcessInfo> running_processes_;
   QMap<QString, QStringList> package_executables_;

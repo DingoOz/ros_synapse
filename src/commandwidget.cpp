@@ -7,6 +7,7 @@
 #include <QSignalMapper>
 #include <QFileDialog>
 #include <QDir>
+#include <QFileInfo>
 
 CommandWidget::CommandWidget(QWidget* parent) 
     : QWidget(parent),
@@ -58,33 +59,47 @@ void CommandWidget::SetupUI() {
 
 void CommandWidget::SetupWorkingDirectory() {
   // Create working directory group
-  working_directory_group_ = new QGroupBox("Working Directory", this);
-  QHBoxLayout* wd_layout = new QHBoxLayout(working_directory_group_);
+  working_directory_group_ = new QGroupBox("Configuration", this);
+  QGridLayout* config_layout = new QGridLayout(working_directory_group_);
   
-  // Create text box for working directory
+  // Working Directory row
+  config_layout->addWidget(new QLabel("Working Directory:", this), 0, 0);
+  
   working_directory_edit_ = new QLineEdit(this);
   working_directory_edit_->setPlaceholderText("Enter working directory path...");
   working_directory_edit_->setMinimumWidth(400);
+  config_layout->addWidget(working_directory_edit_, 0, 1);
   
-  // Load default value from config
-  LoadWorkingDirectoryFromConfig();
-  
-  // Create browse button
   working_directory_button_ = new QPushButton("Browse", this);
   working_directory_button_->setMinimumWidth(100);
+  config_layout->addWidget(working_directory_button_, 0, 2);
   
-  // Add widgets to layout
-  wd_layout->addWidget(new QLabel("Path:", this));
-  wd_layout->addWidget(working_directory_edit_, 1); // Give text box more space
-  wd_layout->addWidget(working_directory_button_);
+  // Setup.bash row
+  config_layout->addWidget(new QLabel("Setup.bash:", this), 1, 0);
   
-  // Connect button signal
+  setup_bash_edit_ = new QLineEdit(this);
+  setup_bash_edit_->setPlaceholderText("Enter setup.bash file path...");
+  setup_bash_edit_->setMinimumWidth(400);
+  config_layout->addWidget(setup_bash_edit_, 1, 1);
+  
+  setup_bash_button_ = new QPushButton("Browse", this);
+  setup_bash_button_->setMinimumWidth(100);
+  config_layout->addWidget(setup_bash_button_, 1, 2);
+  
+  // Load default values from config
+  LoadWorkingDirectoryFromConfig();
+  LoadSetupBashFromConfig();
+  
+  // Connect signals
   connect(working_directory_button_, &QPushButton::clicked,
           this, &CommandWidget::OnWorkingDirectoryButtonClicked);
-  
-  // Connect text change signal
   connect(working_directory_edit_, &QLineEdit::textChanged,
           this, &CommandWidget::WorkingDirectoryChanged);
+  
+  connect(setup_bash_button_, &QPushButton::clicked,
+          this, &CommandWidget::OnSetupBashButtonClicked);
+  connect(setup_bash_edit_, &QLineEdit::textChanged,
+          this, &CommandWidget::SetupBashFileChanged);
 }
 
 void CommandWidget::SetupQuickLaunchButtons() {}
@@ -287,5 +302,52 @@ void CommandWidget::ClearRowProcessId(int row) {
     control_rows_[row].process_id = "";
     control_rows_[row].stop_button->setEnabled(false);
     qDebug() << "Row" << (row + 1) << "process ID cleared";
+  }
+}
+
+QString CommandWidget::GetSetupBashFile() const {
+  if (!setup_bash_edit_) {
+    return QString();
+  }
+  return setup_bash_edit_->text();
+}
+
+void CommandWidget::LoadSetupBashFromConfig() {
+  if (!config_manager_) {
+    return;
+  }
+  
+  // Try to load from config, fall back to default
+  QString setup_bash = config_manager_->GetSetupBashFile();
+  if (setup_bash.isEmpty()) {
+    setup_bash = "~/Programming/tb3_autonomy/install/setup.bash";
+  }
+  
+  setup_bash_edit_->setText(setup_bash);
+}
+
+void CommandWidget::OnSetupBashButtonClicked() {
+  // Get current directory from text box or use home directory
+  QString current_dir = setup_bash_edit_->text().trimmed();
+  if (current_dir.isEmpty()) {
+    current_dir = QDir::homePath();
+  } else {
+    // Extract directory from file path
+    QFileInfo info(current_dir);
+    if (info.isFile()) {
+      current_dir = info.absoluteDir().absolutePath();
+    }
+  }
+  
+  QString selected_file = QFileDialog::getOpenFileName(
+    this,
+    "Select Setup.bash File",
+    current_dir,
+    "Bash Files (*.bash *.sh);;All Files (*)"
+  );
+  
+  if (!selected_file.isEmpty()) {
+    setup_bash_edit_->setText(selected_file);
+    emit SetupBashFileChanged(selected_file);
   }
 }
