@@ -38,6 +38,7 @@ class SSHTabWidget : public QWidget {
  private slots:
   void OnConnectButtonClicked();
   void OnDisconnectButtonClicked();
+  void OnTerminalButtonClicked();
   void OnSSHAddressChanged();
   void OnCommandRowButtonClicked(int row);
   void OnSSHConnectionStatusChanged(bool connected);
@@ -55,6 +56,8 @@ class SSHTabWidget : public QWidget {
   void ParseSSHAddress(const QString& address, QString& user, QString& host, 
                        int& port);
   bool ValidateSSHAddress(const QString& address);
+  QString FindAvailableTerminal();
+  void SpawnSSHTerminal();
 
   // Connection area widgets
   QGroupBox* connection_group_;
@@ -62,6 +65,7 @@ class SSHTabWidget : public QWidget {
   QLineEdit* ssh_address_edit_;
   QPushButton* connect_button_;
   QPushButton* disconnect_button_;
+  QPushButton* terminal_button_;
   QLabel* status_label_;
 
   // Command rows widgets
@@ -86,6 +90,7 @@ class SSHTabWidget : public QWidget {
   bool is_connected_;
   QString current_host_;
   QString current_user_;
+  QString current_password_;
   int current_port_;
 };
 

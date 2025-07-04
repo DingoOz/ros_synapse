@@ -91,6 +91,10 @@ void SSHTabWidget::SetupConnectionArea() {
   disconnect_button_ = new QPushButton("Disconnect", this);
   disconnect_button_->setEnabled(false);
   
+  // Terminal button
+  terminal_button_ = new QPushButton("Open Terminal", this);
+  terminal_button_->setEnabled(false); // Disabled until connected
+  
   // Status label
   status_label_ = new QLabel("Disconnected", this);
   status_label_->setStyleSheet(
@@ -108,6 +112,7 @@ void SSHTabWidget::SetupConnectionArea() {
   connection_layout->addWidget(ssh_address_edit_, 1);
   connection_layout->addWidget(connect_button_);
   connection_layout->addWidget(disconnect_button_);
+  connection_layout->addWidget(terminal_button_);
   connection_layout->addWidget(status_label_);
   
   // Connect signals
@@ -115,6 +120,8 @@ void SSHTabWidget::SetupConnectionArea() {
           this, &SSHTabWidget::OnConnectButtonClicked);
   connect(disconnect_button_, &QPushButton::clicked,
           this, &SSHTabWidget::OnDisconnectButtonClicked);
+  connect(terminal_button_, &QPushButton::clicked,
+          this, &SSHTabWidget::OnTerminalButtonClicked);
   connect(ssh_address_edit_, &QLineEdit::textChanged,
           this, &SSHTabWidget::OnSSHAddressChanged);
   
@@ -187,6 +194,9 @@ void SSHTabWidget::OnConnectButtonClicked() {
   
   if (password_dialog->exec() == QDialog::Accepted) {
     QString password = password_dialog->GetPassword();
+    
+    // Store connection details including password for terminal spawning
+    current_password_ = password;
     
     // Output raw SSH connection information
     output_display_->append("=== SSH Connection Details ===");
@@ -264,6 +274,9 @@ void SSHTabWidget::OnSSHConnectionStatusChanged(bool connected) {
     row.button->setEnabled(connected);
   }
   
+  // Enable/disable terminal button
+  terminal_button_->setEnabled(connected);
+  
   UpdateStatusLabel();
   emit ConnectionStatusChanged(connected);
   
@@ -277,6 +290,9 @@ void SSHTabWidget::OnSSHConnectionStatusChanged(bool connected) {
     output_display_->append("Disconnected from SSH server");
     output_display_->append("Command execution disabled");
     output_display_->append("=============================");
+    
+    // Clear stored password for security
+    current_password_.clear();
   }
 }
 
@@ -440,4 +456,94 @@ bool SSHTabWidget::ValidateSSHAddress(const QString& address) {
   // Validate format: user@host or user@host -p port
   QRegularExpression regex(R"(^[^@\s]+@[^@\s]+(?:\s+-p\s+\d+)?$)");
   return regex.match(address).hasMatch();
+}
+
+void SSHTabWidget::OnTerminalButtonClicked() {
+  if (!is_connected_) {
+    output_display_->append("Error: Not connected to SSH server");
+    return;
+  }
+  
+  output_display_->append("=== Opening SSH Terminal ===");
+  output_display_->append(QString("Target: %1@%2:%3").arg(current_user_, current_host_).arg(current_port_));
+  
+  SpawnSSHTerminal();
+}
+
+QString SSHTabWidget::FindAvailableTerminal() {
+  // List of terminal applications to try, in order of preference
+  QStringList terminals = {
+    "gnome-terminal",
+    "konsole", 
+    "xfce4-terminal",
+    "mate-terminal",
+    "lxterminal",
+    "rxvt-unicode",
+    "urxvt",
+    "rxvt",
+    "xterm"
+  };
+  
+  for (const QString& terminal : terminals) {
+    QProcess process;
+    process.start("which", QStringList() << terminal);
+    process.waitForFinished(1000);
+    
+    if (process.exitCode() == 0) {
+      return terminal;
+    }
+  }
+  
+  return QString(); // No terminal found
+}
+
+void SSHTabWidget::SpawnSSHTerminal() {
+  QString terminal = FindAvailableTerminal();
+  
+  if (terminal.isEmpty()) {
+    output_display_->append("Error: No compatible terminal application found");
+    output_display_->append("Supported terminals: gnome-terminal, konsole, xfce4-terminal, mate-terminal, lxterminal, xterm");
+    return;
+  }
+  
+  // Build SSH command
+  QString ssh_command;
+  if (!current_password_.isEmpty()) {
+    ssh_command = QString("sshpass -p '%1' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p %2 %3@%4")
+                  .arg(current_password_, QString::number(current_port_), current_user_, current_host_);
+  } else {
+    ssh_command = QString("ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p %1 %2@%3")
+                  .arg(QString::number(current_port_), current_user_, current_host_);
+  }
+  
+  // Build terminal command based on terminal type
+  QStringList terminal_args;
+  
+  if (terminal == "gnome-terminal") {
+    terminal_args << "--" << "bash" << "-c" << ssh_command;
+  } else if (terminal == "konsole") {
+    terminal_args << "-e" << "bash" << "-c" << ssh_command;
+  } else if (terminal == "xfce4-terminal") {
+    terminal_args << "-e" << "bash" << "-c" << ssh_command;
+  } else if (terminal == "mate-terminal") {
+    terminal_args << "-e" << "bash" << "-c" << ssh_command;
+  } else if (terminal == "lxterminal") {
+    terminal_args << "-e" << "bash" << "-c" << ssh_command;
+  } else {
+    // For xterm and other basic terminals
+    terminal_args << "-e" << "bash" << "-c" << ssh_command;
+  }
+  
+  // Start the terminal
+  QProcess* terminal_process = new QProcess(this);
+  terminal_process->start(terminal, terminal_args);
+  
+  if (terminal_process->waitForStarted(2000)) {
+    output_display_->append(QString("SSH terminal opened using: %1").arg(terminal));
+    output_display_->append("=============================");
+  } else {
+    output_display_->append(QString("Failed to start terminal: %1").arg(terminal));
+    output_display_->append("=============================");
+    terminal_process->deleteLater();
+  }
 }

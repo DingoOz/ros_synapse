@@ -10,14 +10,17 @@ Program
 - [ ] have a settings window
 - [ ] have an about window
 - [ ] Optional - allow a single button to run all rows of commands with a delay between them (single touch)
+- [ ] all clicking of the ROS_DOMAIN_ID to change it in a dialog window
 
 SSH
 - [X] ssh GUI
 - [X] ability to ssh into a remote pc and run specific commands
-- [ ] show ip address of remote
+- [X] show ip address of remote
 - [X] Show IP address of local 
 - [ ] add a button to spawn a terminal in the ssh session
 - [ ] support public key auth
+- [ ] apply dark theme to the ssh dialog box
+- [ ] poll the status of the connection at a frequency set in settings to change the status if the connection drops
 
 Command Builder
 - [X] ROS_DOMAIN_ID display 
@@ -25,8 +28,10 @@ Command Builder
 - [ ] Add a working folder setting for command builder
 - [ ] add hotkeys to switch between tabs
 - [ ] add a button that spawns a terminal at this location
+- [ ] have a way of showing if the command is outputting to /rosout (if a ros command)
 
-
+Docs
+- [ ] add screenshot to the README
 
 AI analysis
 - [ ] connect to an AI and stream the /rosout log

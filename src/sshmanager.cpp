@@ -167,14 +167,11 @@ void SSHManager::Reconnect() {}
 void SSHManager::OnProcessFinished(int exit_code, QProcess::ExitStatus exit_status) {
   Q_UNUSED(exit_status)
   
-  qDebug() << "SSH process finished with exit code:" << exit_code << "was connected:" << is_connected_;
-  
   // If we had a successful connection (exit code 0) and we detected the connection, 
   // keep the "connected" status for the UI but mark process as finished
   if (exit_code == 0 && is_connected_) {
     // Successful command execution - keep connected status
     connection_timer_->stop();
-    qDebug() << "SSH command completed successfully, maintaining connected status";
   } else {
     // Connection failed or error occurred
     is_connected_ = false;
@@ -256,7 +253,6 @@ void SSHManager::OnReadyReadStandardOutput() {
                           output.contains("$") || output.contains("#") || 
                           output.contains("Welcome") || output.contains("Last login") ||
                           output.contains("Ubuntu") || output.contains("Linux"))) {
-      qDebug() << "SSH connection detected via output pattern";
       is_connected_ = true;
       connection_state_ = kConnected;
       connection_timer_->stop();
