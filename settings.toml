@@ -7,18 +7,18 @@ font_family = "Ubuntu Mono"
 
 [controls]
 # Default options for the 3-row control widget
-row1_dropdown1_options = ["ros2", "rostopic", "rosnode", "rosservice"]
-row1_dropdown1_default = "ros2"
-row1_dropdown2_options = ["launch", "run", "pkg", "node"]
-row1_dropdown2_default = "launch"
+row1_dropdown1_options = ["ros2 launch turtlebot3_bringup pc_slam.launch.py", "rostopic", "rosnode", "rosservice"]
+row1_dropdown1_default = "ros2 launch turtlebot3_bringup pc_slam.launch.py"
+row1_dropdown2_options = ["", "launch", "run", "pkg", "node"]
+row1_dropdown2_default = ""
 
 row2_dropdown1_options = ["turtlebot3_bringup", "turtlebot3_navigation2", "turtlebot3_slam"]
 row2_dropdown1_default = "turtlebot3_bringup"
 row2_dropdown2_options = ["robot.launch.py", "navigation2.launch.py", "slam.launch.py"]
 row2_dropdown2_default = "robot.launch.py"
 
-row3_dropdown1_options = ["teleop", "rviz2", "gazebo"]
-row3_dropdown1_default = "teleop"
+row3_dropdown1_options = ["ros2 launch turtlebot3_navigation2 navigation2.launch.py", "", ""]
+row3_dropdown1_default = "ros2 launch turtlebot3_navigation2 navigation2.launch.py"
 row3_dropdown2_options = ["keyboard", "joy", "twist_mux"]
 row3_dropdown2_default = "keyboard"
 

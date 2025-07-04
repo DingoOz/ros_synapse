@@ -50,7 +50,106 @@ QMap<QString, ROS2Executor::ProcessInfo> ROS2Executor::GetRunningProcesses() con
 }
 
 void ROS2Executor::ExecuteCommand(const QString& command) {
-  Q_UNUSED(command)
+  if (command.trimmed().isEmpty()) {
+    return;
+  }
+  
+  // Create new process for this command
+  QProcess* process = CreateProcess();
+  if (!process) {
+    emit CommandError("Failed to create process");
+    return;
+  }
+  
+  QString process_id = GenerateProcessId();
+  
+  // Store process info
+  ProcessInfo info;
+  info.process = process;
+  info.command = command;
+  info.start_time = QDateTime::currentDateTime();
+  info.is_running = true;
+  
+  running_processes_[process_id] = info;
+  
+  // Set up process environment
+  QStringList env = BuildEnvironment();
+  if (!env.isEmpty()) {
+    process->setEnvironment(env);
+  }
+  
+  // Parse command - handle GUI applications that need to be detached
+  QStringList args = command.split(' ', Qt::SkipEmptyParts);
+  if (args.isEmpty()) {
+    delete process;
+    running_processes_.remove(process_id);
+    emit CommandError("Empty command");
+    return;
+  }
+  
+  QString program = args.takeFirst();
+  
+  // For GUI applications like rviz2, use detached process
+  if (program == "rviz2" || program.contains("rviz") || 
+      command.contains("gazebo") || command.contains("rqt")) {
+    
+    emit CommandOutput(QString("Starting GUI application: %1").arg(command));
+    emit CommandStarted(command, process_id);
+    
+    // Start detached process for GUI applications
+    bool started = QProcess::startDetached(program, args);
+    if (started) {
+      emit CommandOutput(QString("GUI application started successfully: %1").arg(program));
+    } else {
+      emit CommandError(QString("Failed to start GUI application: %1").arg(program));
+    }
+    
+    // Clean up the process since we're using detached
+    delete process;
+    running_processes_.remove(process_id);
+    return;
+  }
+  
+  // For regular commands, use managed process
+  emit CommandStarted(command, process_id);
+  emit CommandOutput(QString("Starting: %1").arg(command));
+  
+  // Connect process signals
+  connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+          [this, process_id](int exit_code, QProcess::ExitStatus) {
+    OnProcessFinished(exit_code, QProcess::NormalExit);
+    CleanupProcess(process_id);
+  });
+  
+  connect(process, &QProcess::errorOccurred, [this, process_id](QProcess::ProcessError error) {
+    Q_UNUSED(error)
+    OnProcessError(error);
+    CleanupProcess(process_id);
+  });
+  
+  connect(process, &QProcess::readyReadStandardOutput, [this, process]() {
+    QByteArray data = process->readAllStandardOutput();
+    QString output = QString::fromUtf8(data);
+    if (!output.isEmpty()) {
+      emit CommandOutput(output);
+    }
+  });
+  
+  connect(process, &QProcess::readyReadStandardError, [this, process]() {
+    QByteArray data = process->readAllStandardError();
+    QString error = QString::fromUtf8(data);
+    if (!error.isEmpty()) {
+      emit CommandError(error);
+    }
+  });
+  
+  // Start the process
+  process->start(program, args);
+  
+  if (!process->waitForStarted(5000)) {
+    emit CommandError(QString("Failed to start command: %1").arg(command));
+    CleanupProcess(process_id);
+  }
 }
 
 void ROS2Executor::ExecuteLaunchFile(const QString& package, const QString& launch_file,
@@ -101,15 +200,29 @@ void ROS2Executor::SetupEnvironment() {}
 void ROS2Executor::SetupProcessMonitoring() {}
 
 QString ROS2Executor::GenerateProcessId() {
-  return QString();
+  static int counter = 0;
+  return QString("proc_%1_%2").arg(QDateTime::currentMSecsSinceEpoch()).arg(++counter);
 }
 
 QProcess* ROS2Executor::CreateProcess() {
-  return nullptr;
+  QProcess* process = new QProcess(this);
+  ConfigureProcess(process);
+  return process;
 }
 
 void ROS2Executor::ConfigureProcess(QProcess* process) {
-  Q_UNUSED(process)
+  if (!process) return;
+  
+  // Set working directory to workspace if available
+  if (!workspace_.isEmpty()) {
+    process->setWorkingDirectory(workspace_);
+  }
+  
+  // Set process environment
+  QStringList env = BuildEnvironment();
+  if (!env.isEmpty()) {
+    process->setEnvironment(env);
+  }
 }
 
 QString ROS2Executor::BuildCommand(const QString& base_command) {
@@ -118,11 +231,36 @@ QString ROS2Executor::BuildCommand(const QString& base_command) {
 }
 
 QStringList ROS2Executor::BuildEnvironment() {
-  return QStringList();
+  QStringList env = QProcess::systemEnvironment();
+  
+  // Add ROS2 domain ID
+  env << QString("ROS_DOMAIN_ID=%1").arg(domain_id_);
+  
+  // Add TurtleBot3 model if set
+  if (!turtlebot3_model_.isEmpty()) {
+    env << QString("TURTLEBOT3_MODEL=%1").arg(turtlebot3_model_);
+  }
+  
+  // Source ROS2 setup if workspace is set
+  if (!workspace_.isEmpty()) {
+    env << QString("ROS_WORKSPACE=%1").arg(workspace_);
+  }
+  
+  return env;
 }
 
 void ROS2Executor::CleanupProcess(const QString& process_id) {
-  Q_UNUSED(process_id)
+  if (!running_processes_.contains(process_id)) {
+    return;
+  }
+  
+  ProcessInfo info = running_processes_[process_id];
+  if (info.process) {
+    info.process->deleteLater();
+  }
+  
+  running_processes_.remove(process_id);
+  emit ProcessListChanged();
 }
 
 void ROS2Executor::ScanForPackages() {}

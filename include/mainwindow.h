@@ -56,6 +56,8 @@ class MainWindow : public QMainWindow {
   void SetupTheme();
   void SetupROS2();
   void SetupSSHStatusTracking();
+  void SetupCommandExecution();
+  void OnCommandReady(const QString& command);
   void AppendLogMessage(const QString& message, const QString& level);
   void UpdateStatusInfo();
   void UpdateSSHConnectionStatus();

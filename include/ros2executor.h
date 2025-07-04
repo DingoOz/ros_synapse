@@ -69,6 +69,10 @@ class ROS2Executor : public QObject {
   void ProcessListChanged();
   void PackageListChanged();
   void ROS2StatusChanged(bool available);
+  
+  // Simplified signals for main window integration
+  void CommandOutput(const QString& output);
+  void CommandError(const QString& error);
 
  private slots:
   void OnProcessFinished(int exit_code, QProcess::ExitStatus exit_status);

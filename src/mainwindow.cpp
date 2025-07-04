@@ -34,6 +34,7 @@ MainWindow::MainWindow(QWidget* parent)
   SetupUI();
   SetupROS2();
   SetupSSHStatusTracking();
+  SetupCommandExecution();
   
   // Setup status update timer
   connect(status_update_timer_, &QTimer::timeout, this, &MainWindow::UpdateStatusInfo);
@@ -364,4 +365,31 @@ void MainWindow::UpdateSSHConnectionStatus() {
       "}"
     );
   }
+}
+
+void MainWindow::SetupCommandExecution() {
+  // Connect command widget to ROS2 executor
+  connect(command_widget_, &CommandWidget::CommandReady,
+          this, &MainWindow::OnCommandReady);
+  
+  // Connect ROS2 executor output to log display (use overloaded signals)
+  connect(ros2_executor_, QOverload<const QString&>::of(&ROS2Executor::CommandOutput),
+          this, [this](const QString& output) {
+    AppendLogMessage(output, "INFO");
+  });
+  
+  connect(ros2_executor_, QOverload<const QString&>::of(&ROS2Executor::CommandError),
+          this, [this](const QString& error) {
+    AppendLogMessage(error, "ERROR");
+  });
+}
+
+void MainWindow::OnCommandReady(const QString& command) {
+  qDebug() << "Executing command:" << command;
+  
+  // Add command to log display
+  AppendLogMessage(QString("Executing: %1").arg(command), "INFO");
+  
+  // Execute command via ROS2 executor
+  ros2_executor_->ExecuteCommand(command);
 }
