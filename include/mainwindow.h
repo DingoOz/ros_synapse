@@ -19,6 +19,7 @@
 #include <QTimer>
 #include <QLabel>
 #include <QFrame>
+#include <QShortcut>
 #include <QNetworkInterface>
 #include <rclcpp/rclcpp.hpp>
 #include <rcl_interfaces/msg/log.hpp>
@@ -42,6 +43,7 @@ class MainWindow : public QMainWindow {
   void OnCommandExecuted(const QString& command, const QString& output);
   void OnProcessStatusChanged(const QString& process, const QString& status);
   void UpdateStatusBar();
+  void ShowHelp();
   void ShowAbout();
   void ShowSettings();
   void OnLogMessageReceived(const rcl_interfaces::msg::Log::SharedPtr msg);
@@ -57,6 +59,7 @@ class MainWindow : public QMainWindow {
   void SetupROS2();
   void SetupSSHStatusTracking();
   void SetupCommandExecution();
+  void SetupKeyboardShortcuts();
   void OnCommandReady(const QString& command, int row);
   void AppendLogMessage(const QString& message, const QString& level);
   void UpdateStatusInfo();
@@ -102,6 +105,7 @@ class MainWindow : public QMainWindow {
   QAction* connect_action_;
   QAction* disconnect_action_;
   QAction* settings_action_;
+  QAction* help_action_;
   QAction* about_action_;
   QAction* quit_action_;
   
@@ -110,6 +114,10 @@ class MainWindow : public QMainWindow {
   rclcpp::Subscription<rcl_interfaces::msg::Log>::SharedPtr log_subscription_;
   std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> executor_;
   QTimer* ros_spin_timer_;
+  
+  // Keyboard shortcuts
+  QShortcut* command_builder_shortcut_;
+  QShortcut* ssh_commands_shortcut_;
 };
 
 #endif  // ROS_SYNAPSE_INCLUDE_MAINWINDOW_H_

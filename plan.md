@@ -12,6 +12,9 @@ Program
 - [ ] get rid of build time warnings
 - [ ] have the option to pre-source (or bash run) the setup.bash (button next to it)
 
+Topic list tab
+-[ ] add a tab for showing the ROS topic list
+
 Tests
 - [ ] add unit tests
 - [ ] add GH workflow
@@ -28,8 +31,8 @@ SSH
 - [X] apply dark theme to the ssh dialog box
 - [ ] poll the status of the connection at a frequency set in settings to change the status if the connection drops - HARD
 - [ ] grey out buttons that aren't clickable until a session is running
-- [ ] add ctrl+c to rows
-- [ ] setup.bash
+- [X] add ctrl+c to rows
+- [X] setup.bash
 
 Command Builder
 - [X] ROS_DOMAIN_ID display 
