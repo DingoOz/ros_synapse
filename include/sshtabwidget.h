@@ -31,6 +31,8 @@ class SSHTabWidget : public QWidget {
   
   QString GetCurrentHost() const;
   QString GetSetupBashFile() const;
+  void SetRowProcessId(int row, const QString& process_id);
+  void ClearRowProcessId(int row);
 
  signals:
   void CommandExecuted(const QString& command, const QString& output);
@@ -43,6 +45,7 @@ class SSHTabWidget : public QWidget {
   void OnSSHAddressChanged();
   void OnSetupBashButtonClicked();
   void OnCommandRowButtonClicked(int row);
+  void OnStopButtonClicked(int row);
   void OnSSHConnectionStatusChanged(bool connected);
   void OnSSHCommandOutput(const QString& output);
   void OnSSHCommandFinished(const QString& command, int exit_code);
@@ -85,6 +88,8 @@ class SSHTabWidget : public QWidget {
     QPushButton* button;
     QComboBox* dropdown1;
     QComboBox* dropdown2;
+    QPushButton* stop_button;
+    QString process_id;  // Track the process ID for this row
   };
   QList<CommandRow> command_rows_;
 

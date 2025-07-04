@@ -8,6 +8,7 @@
 #include <QRegularExpression>
 #include <QDebug>
 #include <QScrollBar>
+#include <QDateTime>
 #include <toml++/toml.hpp>
 
 SSHTabWidget::SSHTabWidget(QWidget* parent)
@@ -201,14 +202,44 @@ void SSHTabWidget::SetupCommandRows() {
     command_row.dropdown2->setEditable(true);
     // Options will be loaded from config file
     
+    // Create stop button
+    command_row.stop_button = new QPushButton("Ctrl+C");
+    command_row.stop_button->setMaximumWidth(80);
+    command_row.stop_button->setEnabled(false); // Disabled until process starts
+    command_row.stop_button->setStyleSheet(
+      "QPushButton {"
+      "  background-color: #d63031;"
+      "  color: white;"
+      "  border: none;"
+      "  padding: 4px 8px;"
+      "  border-radius: 3px;"
+      "  font-weight: bold;"
+      "}"
+      "QPushButton:hover {"
+      "  background-color: #e17055;"
+      "}"
+      "QPushButton:disabled {"
+      "  background-color: #666666;"
+      "  color: #999999;"
+      "}"
+    );
+    
+    // Initialize process ID as empty
+    command_row.process_id = "";
+    
     // Add to grid layout
     grid_layout->addWidget(command_row.button, row, 0);
     grid_layout->addWidget(command_row.dropdown1, row, 1);
     grid_layout->addWidget(command_row.dropdown2, row, 2);
+    grid_layout->addWidget(command_row.stop_button, row, 3);
     
-    // Connect button signal
+    // Connect button signals
     connect(command_row.button, &QPushButton::clicked, [this, row]() {
       OnCommandRowButtonClicked(row);
+    });
+    
+    connect(command_row.stop_button, &QPushButton::clicked, [this, row]() {
+      OnStopButtonClicked(row);
     });
     
     command_rows_.append(command_row);
@@ -323,6 +354,11 @@ void SSHTabWidget::OnCommandRowButtonClicked(int row) {
   output_display_->append(QString("SSH Target: %1@%2:%3").arg(current_user_, current_host_).arg(current_port_));
   output_display_->append("=============================");
   output_display_->append(QString("$ %1").arg(final_command));
+  
+  // Generate a process ID for tracking this command
+  QString process_id = QString("ssh_cmd_%1_%2").arg(QDateTime::currentMSecsSinceEpoch()).arg(row + 1);
+  SetRowProcessId(row, process_id);
+  
   ssh_manager_->ExecuteCommand(final_command);
 }
 
@@ -333,9 +369,16 @@ void SSHTabWidget::OnSSHConnectionStatusChanged(bool connected) {
   connect_button_->setEnabled(!connected);
   disconnect_button_->setEnabled(connected);
   
-  // Enable/disable command buttons
-  for (CommandRow& row : command_rows_) {
+  // Enable/disable command buttons and clear process IDs when disconnecting
+  for (int i = 0; i < command_rows_.size(); ++i) {
+    CommandRow& row = command_rows_[i];
     row.button->setEnabled(connected);
+    
+    // When disconnecting, clear all process IDs and disable stop buttons
+    if (!connected) {
+      row.process_id = "";
+      row.stop_button->setEnabled(false);
+    }
   }
   
   // Enable/disable terminal button
@@ -383,6 +426,12 @@ void SSHTabWidget::OnSSHCommandFinished(const QString& command, int exit_code) {
   output_display_->append(QString("Exit Code: %1").arg(exit_code));
   output_display_->append(QString("Status: %1").arg(exit_code == 0 ? "SUCCESS" : "FAILED"));
   output_display_->append("================================");
+  
+  // Clear all process IDs and disable stop buttons when a command finishes
+  // Note: Since SSH commands run sequentially, we clear all when any finishes
+  for (int i = 0; i < command_rows_.size(); ++i) {
+    ClearRowProcessId(i);
+  }
 }
 
 void SSHTabWidget::OnSSHErrorOccurred(const QString& error) {
@@ -809,4 +858,49 @@ void SSHTabWidget::OnSetupBashButtonClicked() {
   
   // TODO: Implement remote file browsing when connected
   output_display_->append("Remote file browsing not yet implemented. Please enter the path manually.");
+}
+
+void SSHTabWidget::SetRowProcessId(int row, const QString& process_id) {
+  if (row >= 0 && row < command_rows_.size()) {
+    command_rows_[row].process_id = process_id;
+    command_rows_[row].stop_button->setEnabled(!process_id.isEmpty());
+    qDebug() << "SSH Row" << (row + 1) << "process ID set to:" << process_id;
+  }
+}
+
+void SSHTabWidget::ClearRowProcessId(int row) {
+  if (row >= 0 && row < command_rows_.size()) {
+    command_rows_[row].process_id = "";
+    command_rows_[row].stop_button->setEnabled(false);
+    qDebug() << "SSH Row" << (row + 1) << "process ID cleared";
+  }
+}
+
+void SSHTabWidget::OnStopButtonClicked(int row) {
+  if (row >= 0 && row < command_rows_.size()) {
+    const CommandRow& command_row = command_rows_[row];
+    
+    if (!command_row.process_id.isEmpty()) {
+      qDebug() << "Stopping SSH process for Row" << (row + 1) << "- Process ID:" << command_row.process_id;
+      
+      // For SSH commands, we need to send a kill signal to the remote process
+      // This is typically done by sending Ctrl+C (SIGINT) through the SSH connection
+      if (ssh_manager_) {
+        output_display_->append(QString("=== Terminating SSH Command ==="));
+        output_display_->append(QString("Sending Ctrl+C to process: %1").arg(command_row.process_id));
+        output_display_->append(QString("Row: %1").arg(row + 1));
+        output_display_->append("==============================");
+        
+        // Send Ctrl+C signal to the SSH process
+        ssh_manager_->KillCommand(command_row.process_id);
+        
+        // Clear the process ID and disable the stop button
+        command_rows_[row].process_id = "";
+        command_rows_[row].stop_button->setEnabled(false);
+      }
+    } else {
+      qDebug() << "No running SSH process found for Row" << (row + 1);
+      output_display_->append(QString("No running process found for Row %1").arg(row + 1));
+    }
+  }
 }
