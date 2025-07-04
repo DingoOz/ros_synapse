@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 
 #include "ros2executor.h"
+#include <QDir>
 
 ROS2Executor::ROS2Executor(QObject* parent)
     : QObject(parent),
@@ -27,6 +28,11 @@ void ROS2Executor::SetTurtleBot3Model(const QString& model) {
 void ROS2Executor::SetRemoteConnection(const QString& host, const QString& username) {
   remote_host_ = host;
   remote_username_ = username;
+}
+
+void ROS2Executor::SetWorkingDirectory(const QString& directory) {
+  working_directory_ = directory;
+  qDebug() << "ROS2Executor working directory set to:" << working_directory_;
 }
 
 bool ROS2Executor::IsROS2Available() const {
@@ -167,7 +173,31 @@ void ROS2Executor::ExecuteNode(const QString& package, const QString& executable
 }
 
 void ROS2Executor::KillProcess(const QString& process_id) {
-  Q_UNUSED(process_id)
+  if (!running_processes_.contains(process_id)) {
+    qWarning() << "Process not found:" << process_id;
+    return;
+  }
+  
+  ProcessInfo info = running_processes_[process_id];
+  if (info.process && info.process->state() == QProcess::Running) {
+    qDebug() << "Terminating process:" << process_id;
+    
+    // Send SIGTERM first (equivalent to Ctrl+C)
+    info.process->terminate();
+    
+    // Give it 3 seconds to terminate gracefully
+    if (!info.process->waitForFinished(3000)) {
+      qDebug() << "Process didn't terminate gracefully, killing forcefully";
+      info.process->kill();
+      info.process->waitForFinished(1000);
+    }
+    
+    emit CommandFinished(process_id, info.process->exitCode());
+  } else {
+    qDebug() << "Process" << process_id << "is not running";
+  }
+  
+  CleanupProcess(process_id);
 }
 
 void ROS2Executor::KillAllProcesses() {}
@@ -213,9 +243,21 @@ QProcess* ROS2Executor::CreateProcess() {
 void ROS2Executor::ConfigureProcess(QProcess* process) {
   if (!process) return;
   
-  // Set working directory to workspace if available
-  if (!workspace_.isEmpty()) {
-    process->setWorkingDirectory(workspace_);
+  // Set working directory - prefer working_directory_ over workspace_
+  QString work_dir;
+  if (!working_directory_.isEmpty()) {
+    work_dir = working_directory_;
+    // Expand ~ to home directory
+    if (work_dir.startsWith("~/")) {
+      work_dir = QDir::homePath() + work_dir.mid(1);
+    }
+  } else if (!workspace_.isEmpty()) {
+    work_dir = workspace_;
+  }
+  
+  if (!work_dir.isEmpty()) {
+    process->setWorkingDirectory(work_dir);
+    qDebug() << "Process working directory set to:" << work_dir;
   }
   
   // Set process environment

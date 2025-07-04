@@ -29,7 +29,8 @@ MainWindow::MainWindow(QWidget* parent)
       status_update_timer_(new QTimer(this)),
       ros_spin_timer_(new QTimer(this)),
       ssh_connected_(false),
-      ssh_remote_address_("") {
+      ssh_remote_address_(""),
+      current_executing_row_(-1) {
   
   SetupUI();
   SetupROS2();
@@ -372,6 +373,26 @@ void MainWindow::SetupCommandExecution() {
   connect(command_widget_, &CommandWidget::CommandReady,
           this, &MainWindow::OnCommandReady);
   
+  // Connect working directory changes
+  connect(command_widget_, &CommandWidget::WorkingDirectoryChanged,
+          this, [this](const QString& directory) {
+    ros2_executor_->SetWorkingDirectory(directory);
+    AppendLogMessage(QString("Working directory changed to: %1").arg(directory), "INFO");
+  });
+  
+  // Connect stop process requests
+  connect(command_widget_, &CommandWidget::StopProcessRequested,
+          this, [this](const QString& process_id) {
+    ros2_executor_->KillProcess(process_id);
+    AppendLogMessage(QString("Terminating process: %1").arg(process_id), "INFO");
+  });
+  
+  // Set initial working directory
+  QString initial_wd = command_widget_->GetWorkingDirectory();
+  if (!initial_wd.isEmpty()) {
+    ros2_executor_->SetWorkingDirectory(initial_wd);
+  }
+  
   // Connect ROS2 executor output to log display (use overloaded signals)
   connect(ros2_executor_, QOverload<const QString&>::of(&ROS2Executor::CommandOutput),
           this, [this](const QString& output) {
@@ -382,10 +403,33 @@ void MainWindow::SetupCommandExecution() {
           this, [this](const QString& error) {
     AppendLogMessage(error, "ERROR");
   });
+  
+  // Connect process lifecycle signals to track process IDs per row
+  connect(ros2_executor_, QOverload<const QString&, const QString&>::of(&ROS2Executor::CommandStarted),
+          this, [this](const QString& command, const QString& process_id) {
+    // Associate the process with the row that started it
+    if (current_executing_row_ >= 0) {
+      command_widget_->SetRowProcessId(current_executing_row_, process_id);
+    }
+    AppendLogMessage(QString("Started process %1 for command: %2").arg(process_id, command), "INFO");
+  });
+  
+  connect(ros2_executor_, QOverload<const QString&, int>::of(&ROS2Executor::CommandFinished),
+          this, [this](const QString& process_id, int exit_code) {
+    // Clear the process ID from any row that was using it
+    for (int row = 0; row < 4; ++row) {
+      // We'll need to check which row had this process_id
+      command_widget_->ClearRowProcessId(row);
+    }
+    AppendLogMessage(QString("Process %1 finished with exit code %2").arg(process_id).arg(exit_code), "INFO");
+  });
 }
 
-void MainWindow::OnCommandReady(const QString& command) {
-  qDebug() << "Executing command:" << command;
+void MainWindow::OnCommandReady(const QString& command, int row) {
+  qDebug() << "Executing command:" << command << "from row" << (row + 1);
+  
+  // Track which row is executing
+  current_executing_row_ = row;
   
   // Add command to log display
   AppendLogMessage(QString("Executing: %1").arg(command), "INFO");

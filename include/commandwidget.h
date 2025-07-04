@@ -32,10 +32,16 @@ class CommandWidget : public QWidget {
 
  public:
   explicit CommandWidget(QWidget* parent = nullptr);
+  
+  QString GetWorkingDirectory() const;
+  void SetRowProcessId(int row, const QString& process_id);
+  void ClearRowProcessId(int row);
 
  signals:
-  void CommandReady(const QString& command);
+  void CommandReady(const QString& command, int row);
   void CommandExecuted(const QString& command, const QString& output);
+  void WorkingDirectoryChanged(const QString& directory);
+  void StopProcessRequested(const QString& process_id);
 
  private slots:
   void OnPackageSelected(const QString& package);
@@ -47,9 +53,12 @@ class CommandWidget : public QWidget {
   void OnSaveTemplate();
   void OnLoadTemplate();
   void OnClearParameters();
+  void OnWorkingDirectoryButtonClicked();
+  void OnStopButtonClicked(int row);
 
  private:
   void SetupUI();
+  void SetupWorkingDirectory();
   void SetupQuickLaunchButtons();
   void SetupCommandBuilder();
   void SetupParameterForm();
@@ -65,6 +74,7 @@ class CommandWidget : public QWidget {
   QJsonObject GetParameterValues();
   void SetParameterValues(const QJsonObject& parameters);
   void OnControlRowButtonClicked(int row);
+  void LoadWorkingDirectoryFromConfig();
 
   QVBoxLayout* main_layout_;
   QGroupBox* quick_launch_group_;
@@ -90,6 +100,11 @@ class CommandWidget : public QWidget {
   QPushButton* load_template_button_;
   QPushButton* clear_button_;
   
+  // Working directory controls
+  QGroupBox* working_directory_group_;
+  QLineEdit* working_directory_edit_;
+  QPushButton* working_directory_button_;
+  
   QList<QPushButton*> quick_launch_buttons_;
   QList<QWidget*> parameter_widgets_;
   
@@ -98,6 +113,8 @@ class CommandWidget : public QWidget {
     QPushButton* button;
     QComboBox* dropdown1;
     QComboBox* dropdown2;
+    QPushButton* stop_button;
+    QString process_id;  // Track the process ID for this row
   };
   QList<ControlRow> control_rows_;
   

@@ -209,3 +209,18 @@ bool ConfigManager::GetDarkModeEnabled() const {
   }
   return true; // Default to dark mode
 }
+
+QString ConfigManager::GetROS2WorkingDirectory() const {
+  try {
+    if (auto ros2 = toml_config_["ros2"]) {
+      if (auto working_dir = ros2["working_directory"]) {
+        if (working_dir.is_string()) {
+          return QString::fromStdString(working_dir.as_string()->get());
+        }
+      }
+    }
+  } catch (const std::exception& e) {
+    qWarning() << "Error reading working directory setting:" << e.what();
+  }
+  return "~/Programming/tb3_autonomy"; // Default value
+}
