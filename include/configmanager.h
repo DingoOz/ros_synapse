@@ -85,6 +85,9 @@ class ConfigManager : public QObject {
   QStringList GetControlDropdownOptions(const QString& control_name) const;
   QString GetControlDefaultValue(const QString& control_name) const;
   bool GetDarkModeEnabled() const;
+  QString GetROS2WorkingDirectory() const;
+  QString GetSetupBashFile() const;
+  QString GetSSHSetupBashFile() const;
 
  signals:
   void ConfigChanged();

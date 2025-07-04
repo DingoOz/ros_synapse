@@ -1,8 +1,6 @@
 ## Plans for future features
 
 Program
-- [ ] add unit tests
-- [ ] add GH workflow
 - [ ] add doxygen code and documentation
 - [X] add the current ros log in a widget
 - [ ] Fix license to MIT
@@ -11,16 +9,27 @@ Program
 - [ ] have an about window
 - [ ] Optional - allow a single button to run all rows of commands with a delay between them (single touch)
 - [ ] all clicking of the ROS_DOMAIN_ID to change it in a dialog window
+- [ ] get rid of build time warnings
+- [ ] have the option to pre-source (or bash run) the setup.bash (button next to it)
+
+Tests
+- [ ] add unit tests
+- [ ] add GH workflow
+- [ ] any regression tests?
+
 
 SSH
 - [X] ssh GUI
 - [X] ability to ssh into a remote pc and run specific commands
 - [X] show ip address of remote
 - [X] Show IP address of local 
-- [ ] add a button to spawn a terminal in the ssh session
+- [X] add a button to spawn a terminal in the ssh session
 - [ ] support public key auth
-- [ ] apply dark theme to the ssh dialog box
-- [ ] poll the status of the connection at a frequency set in settings to change the status if the connection drops
+- [X] apply dark theme to the ssh dialog box
+- [ ] poll the status of the connection at a frequency set in settings to change the status if the connection drops - HARD
+- [ ] grey out buttons that aren't clickable until a session is running
+- [ ] add ctrl+c to rows
+- [ ] setup.bash
 
 Command Builder
 - [X] ROS_DOMAIN_ID display 
@@ -39,3 +48,4 @@ AI analysis
 - [ ] have a setting for refresh rate
 - [ ] have a slider setting for only reporting more or less critical info (i.e. ignore routine status)
  
+

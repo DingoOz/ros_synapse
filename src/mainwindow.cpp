@@ -29,11 +29,13 @@ MainWindow::MainWindow(QWidget* parent)
       status_update_timer_(new QTimer(this)),
       ros_spin_timer_(new QTimer(this)),
       ssh_connected_(false),
-      ssh_remote_address_("") {
+      ssh_remote_address_(""),
+      current_executing_row_(-1) {
   
   SetupUI();
   SetupROS2();
   SetupSSHStatusTracking();
+  SetupCommandExecution();
   
   // Setup status update timer
   connect(status_update_timer_, &QTimer::timeout, this, &MainWindow::UpdateStatusInfo);
@@ -96,18 +98,25 @@ void MainWindow::SetupUI() {
   
   // Create log display
   log_display_ = new QTextEdit(this);
-  log_display_->setMaximumHeight(200);
+  log_display_->setMinimumHeight(300);  // ~15 lines of text minimum
+  log_display_->setMaximumHeight(400);  // Cap it so it doesn't get too large
   log_display_->setReadOnly(true);
   log_display_->setPlaceholderText("ROS2 log messages will appear here...");
+  
+  // Enable text selection and copying
+  log_display_->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::TextSelectableByKeyboard);
+  log_display_->setCursorWidth(1);  // Show text cursor for selection
+  
   log_display_->setStyleSheet(
     "QTextEdit { background-color: #2b2b2b; color: #ffffff; }"
+    "QTextEdit::selection { background-color: #0078d4; color: #ffffff; }"  // Selection highlight
     "QToolTip { color: #ffffff; background-color: #333333; border: 1px solid #666666; padding: 4px; border-radius: 3px; }"
   );
-  log_display_->setToolTip("/rosout");
+  log_display_->setToolTip("/rosout - Click and drag to select text, Ctrl+C to copy");
   
-  // Add widgets to main layout
-  main_layout->addWidget(tab_widget_, 1); // Tab widget takes most space
-  main_layout->addWidget(log_display_);   // Log display at bottom
+  // Add widgets to main layout with proper sizing
+  main_layout->addWidget(tab_widget_, 2); // Tab widget gets 2/3 of space
+  main_layout->addWidget(log_display_, 1);   // Log display gets 1/3 of space
 }
 
 void MainWindow::SetupROS2() {
@@ -364,4 +373,87 @@ void MainWindow::UpdateSSHConnectionStatus() {
       "}"
     );
   }
+}
+
+void MainWindow::SetupCommandExecution() {
+  // Connect command widget to ROS2 executor
+  connect(command_widget_, &CommandWidget::CommandReady,
+          this, &MainWindow::OnCommandReady);
+  
+  // Connect working directory changes
+  connect(command_widget_, &CommandWidget::WorkingDirectoryChanged,
+          this, [this](const QString& directory) {
+    ros2_executor_->SetWorkingDirectory(directory);
+    AppendLogMessage(QString("Working directory changed to: %1").arg(directory), "INFO");
+  });
+  
+  // Connect setup.bash file changes
+  connect(command_widget_, &CommandWidget::SetupBashFileChanged,
+          this, [this](const QString& setup_file) {
+    ros2_executor_->SetSetupBashFile(setup_file);
+    AppendLogMessage(QString("Setup.bash file changed to: %1").arg(setup_file), "INFO");
+  });
+  
+  // Connect stop process requests
+  connect(command_widget_, &CommandWidget::StopProcessRequested,
+          this, [this](const QString& process_id) {
+    ros2_executor_->KillProcess(process_id);
+    AppendLogMessage(QString("Terminating process: %1").arg(process_id), "INFO");
+  });
+  
+  // Set initial working directory
+  QString initial_wd = command_widget_->GetWorkingDirectory();
+  if (!initial_wd.isEmpty()) {
+    ros2_executor_->SetWorkingDirectory(initial_wd);
+  }
+  
+  // Set initial setup.bash file
+  QString initial_setup = command_widget_->GetSetupBashFile();
+  if (!initial_setup.isEmpty()) {
+    ros2_executor_->SetSetupBashFile(initial_setup);
+  }
+  
+  // Connect ROS2 executor output to log display (use overloaded signals)
+  connect(ros2_executor_, QOverload<const QString&>::of(&ROS2Executor::CommandOutput),
+          this, [this](const QString& output) {
+    AppendLogMessage(output, "INFO");
+  });
+  
+  connect(ros2_executor_, QOverload<const QString&>::of(&ROS2Executor::CommandError),
+          this, [this](const QString& error) {
+    AppendLogMessage(error, "ERROR");
+  });
+  
+  // Connect process lifecycle signals to track process IDs per row
+  connect(ros2_executor_, QOverload<const QString&, const QString&>::of(&ROS2Executor::CommandStarted),
+          this, [this](const QString& command, const QString& process_id) {
+    // Associate the process with the row that started it
+    if (current_executing_row_ >= 0) {
+      command_widget_->SetRowProcessId(current_executing_row_, process_id);
+    }
+    AppendLogMessage(QString("Started process %1 for command: %2").arg(process_id, command), "INFO");
+  });
+  
+  connect(ros2_executor_, QOverload<const QString&, int>::of(&ROS2Executor::CommandFinished),
+          this, [this](const QString& process_id, int exit_code) {
+    // Clear the process ID from any row that was using it
+    for (int row = 0; row < 4; ++row) {
+      // We'll need to check which row had this process_id
+      command_widget_->ClearRowProcessId(row);
+    }
+    AppendLogMessage(QString("Process %1 finished with exit code %2").arg(process_id).arg(exit_code), "INFO");
+  });
+}
+
+void MainWindow::OnCommandReady(const QString& command, int row) {
+  qDebug() << "Executing command:" << command << "from row" << (row + 1);
+  
+  // Track which row is executing
+  current_executing_row_ = row;
+  
+  // Add command to log display
+  AppendLogMessage(QString("Executing: %1").arg(command), "INFO");
+  
+  // Execute command via ROS2 executor
+  ros2_executor_->ExecuteCommand(command);
 }

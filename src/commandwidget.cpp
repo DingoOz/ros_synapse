@@ -5,6 +5,9 @@
 #include "configmanager.h"
 #include <QGridLayout>
 #include <QSignalMapper>
+#include <QFileDialog>
+#include <QDir>
+#include <QFileInfo>
 
 CommandWidget::CommandWidget(QWidget* parent) 
     : QWidget(parent),
@@ -40,6 +43,10 @@ void CommandWidget::OnClearParameters() {}
 void CommandWidget::SetupUI() {
   main_layout_ = new QVBoxLayout(this);
   
+  // Setup working directory controls
+  SetupWorkingDirectory();
+  main_layout_->addWidget(working_directory_group_);
+  
   // Setup control rows group
   control_rows_group_ = new QGroupBox("Command Controls", this);
   main_layout_->addWidget(control_rows_group_);
@@ -48,6 +55,51 @@ void CommandWidget::SetupUI() {
   
   // Add stretch to push everything to the top
   main_layout_->addStretch();
+}
+
+void CommandWidget::SetupWorkingDirectory() {
+  // Create working directory group
+  working_directory_group_ = new QGroupBox("Configuration", this);
+  QGridLayout* config_layout = new QGridLayout(working_directory_group_);
+  
+  // Working Directory row
+  config_layout->addWidget(new QLabel("Working Directory:", this), 0, 0);
+  
+  working_directory_edit_ = new QLineEdit(this);
+  working_directory_edit_->setPlaceholderText("Enter working directory path...");
+  working_directory_edit_->setMinimumWidth(400);
+  config_layout->addWidget(working_directory_edit_, 0, 1);
+  
+  working_directory_button_ = new QPushButton("Browse", this);
+  working_directory_button_->setMinimumWidth(100);
+  config_layout->addWidget(working_directory_button_, 0, 2);
+  
+  // Setup.bash row
+  config_layout->addWidget(new QLabel("Setup.bash:", this), 1, 0);
+  
+  setup_bash_edit_ = new QLineEdit(this);
+  setup_bash_edit_->setPlaceholderText("Enter setup.bash file path...");
+  setup_bash_edit_->setMinimumWidth(400);
+  config_layout->addWidget(setup_bash_edit_, 1, 1);
+  
+  setup_bash_button_ = new QPushButton("Browse", this);
+  setup_bash_button_->setMinimumWidth(100);
+  config_layout->addWidget(setup_bash_button_, 1, 2);
+  
+  // Load default values from config
+  LoadWorkingDirectoryFromConfig();
+  LoadSetupBashFromConfig();
+  
+  // Connect signals
+  connect(working_directory_button_, &QPushButton::clicked,
+          this, &CommandWidget::OnWorkingDirectoryButtonClicked);
+  connect(working_directory_edit_, &QLineEdit::textChanged,
+          this, &CommandWidget::WorkingDirectoryChanged);
+  
+  connect(setup_bash_button_, &QPushButton::clicked,
+          this, &CommandWidget::OnSetupBashButtonClicked);
+  connect(setup_bash_edit_, &QLineEdit::textChanged,
+          this, &CommandWidget::SetupBashFileChanged);
 }
 
 void CommandWidget::SetupQuickLaunchButtons() {}
@@ -89,8 +141,8 @@ void CommandWidget::SetParameterValues(const QJsonObject& parameters) {
 void CommandWidget::SetupControlRows() {
   QGridLayout* grid_layout = new QGridLayout(control_rows_group_);
   
-  // Create 3 rows of controls
-  for (int row = 0; row < 3; ++row) {
+  // Create 4 rows of controls
+  for (int row = 0; row < 4; ++row) {
     ControlRow control_row;
     
     // Create button
@@ -103,6 +155,31 @@ void CommandWidget::SetupControlRows() {
     // Create second dropdown  
     control_row.dropdown2 = new QComboBox();
     control_row.dropdown2->setEditable(true);
+    
+    // Create stop button
+    control_row.stop_button = new QPushButton("Ctrl+C");
+    control_row.stop_button->setMaximumWidth(80);
+    control_row.stop_button->setEnabled(false); // Disabled until process starts
+    control_row.stop_button->setStyleSheet(
+      "QPushButton {"
+      "  background-color: #d63031;"
+      "  color: white;"
+      "  border: none;"
+      "  padding: 4px 8px;"
+      "  border-radius: 3px;"
+      "  font-weight: bold;"
+      "}"
+      "QPushButton:hover {"
+      "  background-color: #e17055;"
+      "}"
+      "QPushButton:disabled {"
+      "  background-color: #636e72;"
+      "  color: #b2bec3;"
+      "}"
+    );
+    
+    // Initialize process tracking
+    control_row.process_id = "";
     
     // Load options from TOML
     QString dropdown1_key = QString("row%1_dropdown1_options").arg(row + 1);
@@ -126,10 +203,15 @@ void CommandWidget::SetupControlRows() {
     grid_layout->addWidget(control_row.button, row, 0);
     grid_layout->addWidget(control_row.dropdown1, row, 1);
     grid_layout->addWidget(control_row.dropdown2, row, 2);
+    grid_layout->addWidget(control_row.stop_button, row, 3);
     
-    // Connect button signal
+    // Connect button signals
     connect(control_row.button, &QPushButton::clicked, [this, row]() {
       OnControlRowButtonClicked(row);
+    });
+    
+    connect(control_row.stop_button, &QPushButton::clicked, [this, row]() {
+      OnStopButtonClicked(row);
     });
     
     control_rows_.append(control_row);
@@ -144,8 +226,128 @@ void CommandWidget::OnControlRowButtonClicked(int row) {
     
     QString command = QString("%1 %2").arg(dropdown1_value, dropdown2_value);
     
-    // Emit signal or execute command
-    emit CommandReady(command);
+    // Emit signal with row number
+    emit CommandReady(command, row);
     qDebug() << "Row" << (row + 1) << "executed:" << command;
+  }
+}
+
+void CommandWidget::OnWorkingDirectoryButtonClicked() {
+  QString current_dir = working_directory_edit_->text();
+  if (current_dir.isEmpty()) {
+    current_dir = QDir::homePath();
+  }
+  
+  QString selected_dir = QFileDialog::getExistingDirectory(
+    this,
+    "Select Working Directory",
+    current_dir,
+    QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks
+  );
+  
+  if (!selected_dir.isEmpty()) {
+    working_directory_edit_->setText(selected_dir);
+    emit WorkingDirectoryChanged(selected_dir);
+  }
+}
+
+QString CommandWidget::GetWorkingDirectory() const {
+  if (!working_directory_edit_) {
+    return QString();
+  }
+  return working_directory_edit_->text();
+}
+
+void CommandWidget::LoadWorkingDirectoryFromConfig() {
+  if (!config_manager_) {
+    return;
+  }
+  
+  // Try to load from config, fall back to default
+  QString working_dir = config_manager_->GetROS2WorkingDirectory();
+  if (working_dir.isEmpty()) {
+    working_dir = "~/Programming/tb3_autonomy";
+  }
+  
+  working_directory_edit_->setText(working_dir);
+}
+
+void CommandWidget::OnStopButtonClicked(int row) {
+  if (row >= 0 && row < control_rows_.size()) {
+    const ControlRow& control_row = control_rows_[row];
+    
+    if (!control_row.process_id.isEmpty()) {
+      qDebug() << "Stopping process for Row" << (row + 1) << "- Process ID:" << control_row.process_id;
+      emit StopProcessRequested(control_row.process_id);
+      
+      // Disable the stop button and clear process ID
+      control_row.stop_button->setEnabled(false);
+      control_rows_[row].process_id = "";
+    } else {
+      qDebug() << "No running process found for Row" << (row + 1);
+    }
+  }
+}
+
+void CommandWidget::SetRowProcessId(int row, const QString& process_id) {
+  if (row >= 0 && row < control_rows_.size()) {
+    control_rows_[row].process_id = process_id;
+    control_rows_[row].stop_button->setEnabled(!process_id.isEmpty());
+    qDebug() << "Row" << (row + 1) << "process ID set to:" << process_id;
+  }
+}
+
+void CommandWidget::ClearRowProcessId(int row) {
+  if (row >= 0 && row < control_rows_.size()) {
+    control_rows_[row].process_id = "";
+    control_rows_[row].stop_button->setEnabled(false);
+    qDebug() << "Row" << (row + 1) << "process ID cleared";
+  }
+}
+
+QString CommandWidget::GetSetupBashFile() const {
+  if (!setup_bash_edit_) {
+    return QString();
+  }
+  return setup_bash_edit_->text();
+}
+
+void CommandWidget::LoadSetupBashFromConfig() {
+  if (!config_manager_) {
+    return;
+  }
+  
+  // Try to load from config, fall back to default
+  QString setup_bash = config_manager_->GetSetupBashFile();
+  if (setup_bash.isEmpty()) {
+    setup_bash = "~/Programming/tb3_autonomy/install/setup.bash";
+  }
+  
+  setup_bash_edit_->setText(setup_bash);
+}
+
+void CommandWidget::OnSetupBashButtonClicked() {
+  // Get current directory from text box or use home directory
+  QString current_dir = setup_bash_edit_->text().trimmed();
+  if (current_dir.isEmpty()) {
+    current_dir = QDir::homePath();
+  } else {
+    // Extract directory from file path
+    QFileInfo info(current_dir);
+    if (info.isFile()) {
+      current_dir = info.absoluteDir().absolutePath();
+    }
+  }
+  
+  QString selected_file = QFileDialog::getOpenFileName(
+    this,
+    "Select Setup.bash File",
+    current_dir,
+    "Bash Files (*.bash *.sh);;All Files (*)"
+  );
+  
+  if (!selected_file.isEmpty()) {
+    setup_bash_edit_->setText(selected_file);
+    emit SetupBashFileChanged(selected_file);
   }
 }

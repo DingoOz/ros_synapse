@@ -7,29 +7,36 @@ font_family = "Ubuntu Mono"
 
 [controls]
 # Default options for the 3-row control widget
-row1_dropdown1_options = ["ros2", "rostopic", "rosnode", "rosservice"]
-row1_dropdown1_default = "ros2"
-row1_dropdown2_options = ["launch", "run", "pkg", "node"]
-row1_dropdown2_default = "launch"
+row1_dropdown1_options = ["ros2 launch xbox_teleop_stamped.launch.py", "ros2 run teleop_twist_joy teleop_node", "", ""]
+row1_dropdown1_default = "ros2 launch xbox_teleop_stamped.launch.py"
+row1_dropdown2_options = [""]
+row1_dropdown2_default = ""
 
-row2_dropdown1_options = ["turtlebot3_bringup", "turtlebot3_navigation2", "turtlebot3_slam"]
-row2_dropdown1_default = "turtlebot3_bringup"
-row2_dropdown2_options = ["robot.launch.py", "navigation2.launch.py", "slam.launch.py"]
-row2_dropdown2_default = "robot.launch.py"
+row2_dropdown1_options = ["ros2 launch turtlebot3_bringup pc_slam.launch.py"]
+row2_dropdown1_default = "ros2 launch turtlebot3_bringup pc_slam.launch.py"
+row2_dropdown2_options = ["slam_params_file:=src/turtlebot3/turtlebot3_bringup/param/mapper_params_confined.yaml", " "]
+row2_dropdown2_default = " "
 
-row3_dropdown1_options = ["teleop", "rviz2", "gazebo"]
-row3_dropdown1_default = "teleop"
-row3_dropdown2_options = ["keyboard", "joy", "twist_mux"]
-row3_dropdown2_default = "keyboard"
+row3_dropdown1_options = ["ros2 launch turtlebot3_navigation2 navigation2.launch.py", "", ""]
+row3_dropdown1_default = "ros2 launch turtlebot3_navigation2 navigation2.launch.py"
+row3_dropdown2_options = ["params_file:=/home/dingo/Programming/tb3_autonomy/src/turtlebot3/turtlebot3_bringup/param/burger_nav_basic.yaml", "params_file:=/home/dingo/Programming/tb3_autonomy/src/turtlebot3/turtlebot3_bringup/param/burger_nav_improved.yaml", "  "]
+row3_dropdown2_default = "params_file:=/home/dingo/Programming/tb3_autonomy/src/turtlebot3/turtlebot3_bringup/param/burger_nav_improved.yaml"
+
+row4_dropdown1_options = ["bash install/setup.bash", "rqt", "ros2 topic list"]
+row4_dropdown1_default = "bash install/setup.bash"
+row4_dropdown2_options = [""]
+row4_dropdown2_default = ""
 
 [ros2]
 workspace = "~/ros2_ws"
 domain_id = 0
 turtlebot3_model = "burger"
+working_directory = "~/Programming/tb3_autonomy"
+setup_bash_file = "~/Programming/tb3_autonomy/install/setup.bash"
 
 [connection]
-default_host = "192.168.1.100"
-default_username = "ubuntu"
+default_host = "192.168.1.213"
+default_username = "dingo"
 default_port = 22
 use_key_auth = true
 key_file = "~/.ssh/id_rsa"
@@ -37,11 +44,19 @@ key_file = "~/.ssh/id_rsa"
 [ssh]
 # SSH default values
 default_address = "dingo@turtlebot3"
+setup_bash_file = "~/tb3_autonomy/install/setup.bash"
 default_commands = [
-    ["watch df", "-h"],
+    ["ros2 launch dingo.robot.launch.py", ""],
     ["htop", ""]
 ]
 
 # SSH dropdown options
 dropdown1_options = ["ls", "cd", "pwd", "ps", "top", "df", "htop", "watch df", "systemctl", "journalctl", "free", "uptime"]
 dropdown2_options = ["-la", "-aux", "-h", "--help", "", "-f", "-m", "-1", "status", "restart", "stop", "start"]
+
+# SSH connection polling settings
+# Note: Polling may not work reliably with command-based SSH connections
+poll_connection = false         # Enable/disable connection polling
+poll_interval = 5              # Polling interval in seconds
+poll_timeout = 3               # Timeout for each poll attempt in seconds
+max_poll_failures = 3          # Max consecutive failures before disconnecting

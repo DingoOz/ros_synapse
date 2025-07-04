@@ -42,6 +42,8 @@ class ROS2Executor : public QObject {
   void SetROS2Environment(const QString& workspace, int domain_id = 0);
   void SetTurtleBot3Model(const QString& model);
   void SetRemoteConnection(const QString& host, const QString& username);
+  void SetWorkingDirectory(const QString& directory);
+  void SetSetupBashFile(const QString& setup_file);
   
   bool IsROS2Available() const;
   QStringList GetAvailablePackages() const;
@@ -69,6 +71,10 @@ class ROS2Executor : public QObject {
   void ProcessListChanged();
   void PackageListChanged();
   void ROS2StatusChanged(bool available);
+  
+  // Simplified signals for main window integration
+  void CommandOutput(const QString& output);
+  void CommandError(const QString& error);
 
  private slots:
   void OnProcessFinished(int exit_code, QProcess::ExitStatus exit_status);
@@ -97,6 +103,8 @@ class ROS2Executor : public QObject {
   QString turtlebot3_model_;
   QString remote_host_;
   QString remote_username_;
+  QString working_directory_;
+  QString setup_bash_file_;
   
   QMap<QString, ProcessInfo> running_processes_;
   QMap<QString, QStringList> package_executables_;

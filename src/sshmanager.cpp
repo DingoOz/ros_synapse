@@ -423,3 +423,21 @@ QString SSHManager::BuildSSHCommand(const QString& command) {
   Q_UNUSED(command)
   return QString();
 }
+
+void SSHManager::KillCommand(const QString& process_id) {
+  if (!is_connected_ || !ssh_process_ || ssh_process_->state() != QProcess::Running) {
+    qWarning() << "Cannot kill SSH command: not connected or SSH process not running";
+    return;
+  }
+  
+  // For SSH connections, we send Ctrl+C (ASCII 3) to interrupt the running command
+  // This is the standard way to interrupt a running process via SSH
+  QByteArray interrupt_signal;
+  interrupt_signal.append(char(3)); // Ctrl+C character
+  
+  qDebug() << "Sending Ctrl+C signal to SSH process for process ID:" << process_id;
+  ssh_process_->write(interrupt_signal);
+  
+  // Alternatively, we could send a kill command if we know the PID
+  // ExecuteCommand(QString("kill -INT %1").arg(process_id));
+}

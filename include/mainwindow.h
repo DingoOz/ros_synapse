@@ -56,6 +56,8 @@ class MainWindow : public QMainWindow {
   void SetupTheme();
   void SetupROS2();
   void SetupSSHStatusTracking();
+  void SetupCommandExecution();
+  void OnCommandReady(const QString& command, int row);
   void AppendLogMessage(const QString& message, const QString& level);
   void UpdateStatusInfo();
   void UpdateSSHConnectionStatus();
@@ -85,6 +87,9 @@ class MainWindow : public QMainWindow {
   // SSH connection tracking
   bool ssh_connected_;
   QString ssh_remote_address_;
+  
+  // Command execution tracking
+  int current_executing_row_;
   
   SSHManager* ssh_manager_;
   ROS2Executor* ros2_executor_;

@@ -44,6 +44,7 @@ class SSHManager : public QObject {
   void ExecuteCommand(const QString& command);
   void ExecuteCommandAsync(const QString& command);
   void SendInput(const QString& input);
+  void KillCommand(const QString& process_id);
   void Reconnect();
 
  signals:
