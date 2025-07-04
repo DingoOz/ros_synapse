@@ -328,15 +328,12 @@ void MainWindow::SetupSSHStatusTracking() {
 }
 
 void MainWindow::OnSSHConnectionChanged(bool connected) {
-  qDebug() << "SSH connection changed:" << connected;
   ssh_connected_ = connected;
   
   if (connected) {
     // Extract IP address from SSH tab widget
     ssh_remote_address_ = ssh_tab_widget_->GetCurrentHost();
-    qDebug() << "SSH connected to:" << ssh_remote_address_;
   } else {
-    qDebug() << "SSH disconnected";
     ssh_remote_address_ = "";
   }
   
