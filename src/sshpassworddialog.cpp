@@ -16,6 +16,9 @@ SSHPasswordDialog::SSHPasswordDialog(const QString& username, const QString& hos
   setModal(true);
   setFixedSize(500, 250);
   
+  // Set window flags for better dark theme integration
+  setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+  
   SetupUI();
   SetupConnections();
   
@@ -36,36 +39,36 @@ void SSHPasswordDialog::SetPassword(const QString& password) {
 void SSHPasswordDialog::SetupUI() {
   main_layout_ = new QVBoxLayout(this);
   
-  // Set dialog background
-  setStyleSheet("QDialog { background-color: #f5f5f5; }");
+  // Set dialog background to match dark theme
+  setStyleSheet("QDialog { background-color: #2b2b2b; color: #ffffff; }");
   
   // Info label
   info_label_ = new QLabel("Enter password for SSH connection:", this);
   info_label_->setWordWrap(true);
-  info_label_->setStyleSheet("font-weight: bold; color: #333333; margin-bottom: 10px; background-color: transparent;");
+  info_label_->setStyleSheet("font-weight: bold; color: #ffffff; margin-bottom: 10px; background-color: transparent;");
   main_layout_->addWidget(info_label_);
   
   // Connection details form
   form_layout_ = new QFormLayout();
   form_layout_->setSpacing(12);
   
-  // Style for form labels
-  QString label_style = "QLabel { color: #333333; font-weight: bold; background-color: transparent; }";
+  // Style for form labels - dark theme
+  QString label_style = "QLabel { color: #ffffff; font-weight: bold; background-color: transparent; }";
   
   username_label_ = new QLabel(username_, this);
-  username_label_->setStyleSheet("font-family: monospace; background-color: #e0e0e0; color: #333333; padding: 4px 8px; border-radius: 3px;");
+  username_label_->setStyleSheet("font-family: monospace; background-color: #4a4a4a; color: #ffffff; padding: 4px 8px; border-radius: 3px;");
   QLabel* username_field_label = new QLabel("Username:", this);
   username_field_label->setStyleSheet(label_style);
   form_layout_->addRow(username_field_label, username_label_);
   
   host_label_ = new QLabel(host_, this);
-  host_label_->setStyleSheet("font-family: monospace; background-color: #e0e0e0; color: #333333; padding: 4px 8px; border-radius: 3px;");
+  host_label_->setStyleSheet("font-family: monospace; background-color: #4a4a4a; color: #ffffff; padding: 4px 8px; border-radius: 3px;");
   QLabel* host_field_label = new QLabel("Host:", this);
   host_field_label->setStyleSheet(label_style);
   form_layout_->addRow(host_field_label, host_label_);
   
   port_label_ = new QLabel(QString::number(port_), this);
-  port_label_->setStyleSheet("font-family: monospace; background-color: #e0e0e0; color: #333333; padding: 4px 8px; border-radius: 3px;");
+  port_label_->setStyleSheet("font-family: monospace; background-color: #4a4a4a; color: #ffffff; padding: 4px 8px; border-radius: 3px;");
   QLabel* port_field_label = new QLabel("Port:", this);
   port_field_label->setStyleSheet(label_style);
   form_layout_->addRow(port_field_label, port_label_);
@@ -78,17 +81,17 @@ void SSHPasswordDialog::SetupUI() {
   password_edit_->setStyleSheet(
     "QLineEdit {"
     "  padding: 10px;"
-    "  border: 2px solid #cccccc;"
+    "  border: 2px solid #555555;"
     "  border-radius: 4px;"
     "  font-size: 14px;"
-    "  background-color: #ffffff;"
-    "  color: #333333;"
+    "  background-color: #3b3b3b;"
+    "  color: #ffffff;"
     "}"
     "QLineEdit:focus {"
     "  border-color: #0078d4;"
     "}"
     "QLineEdit::placeholder {"
-    "  color: #999999;"
+    "  color: #aaaaaa;"
     "}"
   );
   QLabel* password_field_label = new QLabel("Password:", this);
@@ -99,6 +102,7 @@ void SSHPasswordDialog::SetupUI() {
   
   // Buttons
   button_box_ = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
+  button_box_->setStyleSheet("QDialogButtonBox { background-color: transparent; }");
   connect_button_ = button_box_->button(QDialogButtonBox::Ok);
   cancel_button_ = button_box_->button(QDialogButtonBox::Cancel);
   
@@ -107,7 +111,7 @@ void SSHPasswordDialog::SetupUI() {
   connect_button_->setStyleSheet(
     "QPushButton {"
     "  background-color: #0078d4;"
-    "  color: white;"
+    "  color: #ffffff;"
     "  border: none;"
     "  padding: 8px 16px;"
     "  border-radius: 4px;"
@@ -117,22 +121,22 @@ void SSHPasswordDialog::SetupUI() {
     "  background-color: #106ebe;"
     "}"
     "QPushButton:disabled {"
-    "  background-color: #cccccc;"
-    "  color: #666666;"
+    "  background-color: #555555;"
+    "  color: #888888;"
     "}"
   );
   
   cancel_button_->setText("Cancel");
   cancel_button_->setStyleSheet(
     "QPushButton {"
-    "  background-color: #ffffff;"
-    "  color: #333333;"
-    "  border: 1px solid #cccccc;"
+    "  background-color: #4a4a4a;"
+    "  color: #ffffff;"
+    "  border: 1px solid #666666;"
     "  padding: 8px 16px;"
     "  border-radius: 4px;"
     "}"
     "QPushButton:hover {"
-    "  background-color: #f0f0f0;"
+    "  background-color: #5a5a5a;"
     "}"
   );
   
