@@ -17,9 +17,9 @@ SSH
 - [X] ability to ssh into a remote pc and run specific commands
 - [X] show ip address of remote
 - [X] Show IP address of local 
-- [ ] add a button to spawn a terminal in the ssh session
+- [X] add a button to spawn a terminal in the ssh session
 - [ ] support public key auth
-- [ ] apply dark theme to the ssh dialog box
+- [X] apply dark theme to the ssh dialog box
 - [ ] poll the status of the connection at a frequency set in settings to change the status if the connection drops
 
 Command Builder

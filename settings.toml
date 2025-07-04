@@ -45,3 +45,10 @@ default_commands = [
 # SSH dropdown options
 dropdown1_options = ["ls", "cd", "pwd", "ps", "top", "df", "htop", "watch df", "systemctl", "journalctl", "free", "uptime"]
 dropdown2_options = ["-la", "-aux", "-h", "--help", "", "-f", "-m", "-1", "status", "restart", "stop", "start"]
+
+# SSH connection polling settings
+# Note: Polling may not work reliably with command-based SSH connections
+poll_connection = false         # Enable/disable connection polling
+poll_interval = 5              # Polling interval in seconds
+poll_timeout = 3               # Timeout for each poll attempt in seconds
+max_poll_failures = 3          # Max consecutive failures before disconnecting

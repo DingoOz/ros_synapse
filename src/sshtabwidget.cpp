@@ -15,11 +15,18 @@ SSHTabWidget::SSHTabWidget(QWidget* parent)
       config_manager_(new ConfigManager(this)),
       ssh_manager_(new SSHManager(this)),
       status_update_timer_(new QTimer(this)),
+      connection_poll_timer_(new QTimer(this)),
       is_connected_(false),
-      current_port_(22) {
+      current_port_(22),
+      poll_enabled_(false),
+      poll_interval_seconds_(5),
+      poll_timeout_seconds_(3),
+      poll_failure_count_(0),
+      max_poll_failures_(3) {
   
   SetupUI();
   LoadDefaultsFromConfig();
+  LoadPollingConfig();
   
   // Connect SSH manager signals
   connect(ssh_manager_, &SSHManager::Connected, 
@@ -37,6 +44,10 @@ SSHTabWidget::SSHTabWidget(QWidget* parent)
   connect(status_update_timer_, &QTimer::timeout, 
           this, &SSHTabWidget::UpdateConnectionStatus);
   status_update_timer_->start(2000); // Update every 2 seconds
+  
+  // Setup connection polling timer
+  connect(connection_poll_timer_, &QTimer::timeout,
+          this, &SSHTabWidget::PollSSHConnection);
   
   UpdateStatusLabel();
 }
@@ -266,7 +277,8 @@ void SSHTabWidget::OnCommandRowButtonClicked(int row) {
 void SSHTabWidget::OnSSHConnectionStatusChanged(bool connected) {
   is_connected_ = connected;
   
-  connect_button_->setEnabled(!connected && ValidateSSHAddress(ssh_address_edit_->text()));
+  // Connect button should be enabled when disconnected (regardless of polling)
+  connect_button_->setEnabled(!connected);
   disconnect_button_->setEnabled(connected);
   
   // Enable/disable command buttons
@@ -285,11 +297,17 @@ void SSHTabWidget::OnSSHConnectionStatusChanged(bool connected) {
     output_display_->append(QString("Successfully connected to %1@%2:%3").arg(current_user_, current_host_).arg(current_port_));
     output_display_->append(QString("SSH session active - ready to execute commands"));
     output_display_->append("================================");
+    
+    // Start connection polling when connected
+    StartConnectionPolling();
   } else {
     output_display_->append("=== SSH Connection Closed ===");
     output_display_->append("Disconnected from SSH server");
     output_display_->append("Command execution disabled");
     output_display_->append("=============================");
+    
+    // Stop connection polling when disconnected
+    StopConnectionPolling();
     
     // Clear stored password for security
     current_password_.clear();
@@ -546,4 +564,152 @@ void SSHTabWidget::SpawnSSHTerminal() {
     output_display_->append("=============================");
     terminal_process->deleteLater();
   }
+}
+
+void SSHTabWidget::LoadPollingConfig() {
+  try {
+    // Try to load config from file
+    toml::table config;
+    try {
+      config = toml::parse_file("../settings.toml");
+    } catch (const toml::parse_error& err) {
+      try {
+        config = toml::parse_file("settings.toml");
+      } catch (const toml::parse_error& err2) {
+        qWarning() << "Failed to load settings.toml for polling config:" << err2.what();
+        return;
+      }
+    }
+    
+    if (auto ssh_section = config["ssh"].as_table()) {
+      // Load polling configuration
+      if (auto poll_enabled = ssh_section->get("poll_connection")->as_boolean()) {
+        poll_enabled_ = poll_enabled->get();
+      }
+      if (auto poll_interval = ssh_section->get("poll_interval")->as_integer()) {
+        poll_interval_seconds_ = static_cast<int>(poll_interval->get());
+      }
+      if (auto poll_timeout = ssh_section->get("poll_timeout")->as_integer()) {
+        poll_timeout_seconds_ = static_cast<int>(poll_timeout->get());
+      }
+      if (auto max_failures = ssh_section->get("max_poll_failures")->as_integer()) {
+        max_poll_failures_ = static_cast<int>(max_failures->get());
+      }
+      
+      qDebug() << "SSH polling config loaded - enabled:" << poll_enabled_ 
+               << "interval:" << poll_interval_seconds_ << "s"
+               << "timeout:" << poll_timeout_seconds_ << "s"
+               << "max_failures:" << max_poll_failures_;
+      
+      if (!poll_enabled_) {
+        qDebug() << "SSH polling is disabled (recommended for command-based SSH connections)";
+      }
+    }
+  } catch (const std::exception& e) {
+    qWarning() << "Error loading SSH polling config:" << e.what();
+    // Use default values if config fails to load
+    poll_enabled_ = false;  // Disabled by default - doesn't work well with command-based SSH
+    poll_interval_seconds_ = 5;
+    poll_timeout_seconds_ = 3;
+    max_poll_failures_ = 3;
+  }
+}
+
+void SSHTabWidget::StartConnectionPolling() {
+  if (poll_enabled_ && !connection_poll_timer_->isActive()) {
+    poll_failure_count_ = 0; // Reset failure count when starting polling
+    connection_poll_timer_->start(poll_interval_seconds_ * 1000); // Convert to milliseconds
+    qDebug() << "Started SSH connection polling with" << poll_interval_seconds_ << "second intervals";
+  }
+}
+
+void SSHTabWidget::StopConnectionPolling() {
+  if (connection_poll_timer_->isActive()) {
+    connection_poll_timer_->stop();
+    qDebug() << "Stopped SSH connection polling";
+  }
+}
+
+void SSHTabWidget::PollSSHConnection() {
+  if (!is_connected_ || current_host_.isEmpty() || current_user_.isEmpty()) {
+    qDebug() << "Skipping SSH poll - not connected or missing connection info";
+    return;
+  }
+  
+  // Skip polling if we've reached max failures to avoid spam
+  if (poll_failure_count_ >= max_poll_failures_) {
+    qDebug() << "Skipping SSH poll - too many failures";
+    return;
+  }
+  
+  qDebug() << "Polling SSH connection to" << current_user_ << "@" << current_host_ << ":" << current_port_;
+  
+  // Create a lightweight SSH test to check connection status
+  QProcess* poll_process = new QProcess(this);
+  
+  // Build polling command - simple echo test with timeout
+  QString program;
+  QStringList arguments;
+  
+  if (!current_password_.isEmpty()) {
+    program = "sshpass";
+    arguments << "-p" << current_password_
+             << "ssh"
+             << "-o" << "StrictHostKeyChecking=no"
+             << "-o" << "UserKnownHostsFile=/dev/null"
+             << "-o" << "LogLevel=QUIET"
+             << "-o" << "BatchMode=yes"
+             << "-o" << QString("ConnectTimeout=%1").arg(poll_timeout_seconds_)
+             << "-p" << QString::number(current_port_)
+             << QString("%1@%2").arg(current_user_, current_host_)
+             << "echo SSH_POLL_OK";
+  } else {
+    program = "ssh";
+    arguments << "-o" << "StrictHostKeyChecking=no"
+             << "-o" << "UserKnownHostsFile=/dev/null"
+             << "-o" << "LogLevel=QUIET"
+             << "-o" << "BatchMode=yes"
+             << "-o" << QString("ConnectTimeout=%1").arg(poll_timeout_seconds_)
+             << "-p" << QString::number(current_port_)
+             << QString("%1@%2").arg(current_user_, current_host_)
+             << "echo SSH_POLL_OK";
+  }
+  
+  // Set process timeout and connect completion handler
+  QTimer::singleShot(poll_timeout_seconds_ * 1000 + 1000, poll_process, [poll_process]() {
+    if (poll_process->state() == QProcess::Running) {
+      poll_process->kill();
+    }
+  });
+  
+  connect(poll_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+          [this, poll_process](int exit_code, QProcess::ExitStatus) {
+    bool connection_ok = (exit_code == 0);
+    
+    if (connection_ok && is_connected_) {
+      // Connection successful - reset failure count
+      poll_failure_count_ = 0;
+    } else if (!connection_ok && is_connected_) {
+      // Connection failed - increment failure count
+      poll_failure_count_++;
+      qDebug() << "SSH poll failed (" << poll_failure_count_ << "/" << max_poll_failures_ << ")";
+      
+      // Only disconnect after multiple consecutive failures
+      if (poll_failure_count_ >= max_poll_failures_) {
+        qDebug() << "SSH polling detected persistent connection loss after" << max_poll_failures_ << "failures";
+        OnSSHConnectionStatusChanged(false);
+        poll_failure_count_ = 0; // Reset for next connection
+      }
+    } else if (connection_ok && !is_connected_) {
+      // Connection restored - update status (this case is less likely)
+      qDebug() << "SSH polling detected connection restoration";
+      OnSSHConnectionStatusChanged(true);
+      poll_failure_count_ = 0;
+    }
+    
+    poll_process->deleteLater();
+  });
+  
+  qDebug() << "Executing SSH poll command:" << program << arguments.join(" ");
+  poll_process->start(program, arguments);
 }

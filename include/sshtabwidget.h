@@ -58,6 +58,10 @@ class SSHTabWidget : public QWidget {
   bool ValidateSSHAddress(const QString& address);
   QString FindAvailableTerminal();
   void SpawnSSHTerminal();
+  void LoadPollingConfig();
+  void StartConnectionPolling();
+  void StopConnectionPolling();
+  void PollSSHConnection();
 
   // Connection area widgets
   QGroupBox* connection_group_;
@@ -85,6 +89,7 @@ class SSHTabWidget : public QWidget {
   ConfigManager* config_manager_;
   SSHManager* ssh_manager_;
   QTimer* status_update_timer_;
+  QTimer* connection_poll_timer_;
 
   // Connection state
   bool is_connected_;
@@ -92,6 +97,13 @@ class SSHTabWidget : public QWidget {
   QString current_user_;
   QString current_password_;
   int current_port_;
+  
+  // Polling configuration
+  bool poll_enabled_;
+  int poll_interval_seconds_;
+  int poll_timeout_seconds_;
+  int poll_failure_count_;
+  int max_poll_failures_;
 };
 
 #endif  // ROS_SYNAPSE_INCLUDE_SSHTABWIDGET_H_
